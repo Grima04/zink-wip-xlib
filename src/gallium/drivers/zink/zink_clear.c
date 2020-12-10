@@ -32,6 +32,7 @@
 #include "util/u_framebuffer.h"
 #include "util/u_inlines.h"
 #include "util/u_rect.h"
+#include "util/u_sampler.h"
 #include "util/u_surface.h"
 #include "util/u_helpers.h"
 
@@ -386,7 +387,9 @@ zink_clear_texture(struct pipe_context *pctx,
       union pipe_color_union color;
 
       util_format_unpack_rgba(pres->format, color.ui, data, 1);
-
+      if (util_format_is_argb(pres->format) || util_format_is_xrgb(pres->format) ||
+          util_format_is_abgr(pres->format) || util_format_is_xbgr(pres->format))
+         u_sampler_format_swizzle_color_argb(&color, true);
       if (pscreen->is_format_supported(pscreen, pres->format, pres->target, 0, 0,
                                       PIPE_BIND_RENDER_TARGET) && !needs_rp && !batch->in_rp) {
          clear_color_no_rp(ctx, res, &color, level, box->z, box->depth);
