@@ -173,6 +173,11 @@ EXTENSIONS = [
         alias="template"),
     Extension("VK_KHR_dedicated_allocation",
         alias="dedicated"),
+    Extension("VK_EXT_descriptor_indexing",
+        alias="desc_indexing",
+        features=True,
+        properties=True,
+        conditions=["$feats.descriptorBindingPartiallyBound"]),
 ]
 
 # constructor: Versions(device_version(major, minor, patch), struct_version(major, minor))
