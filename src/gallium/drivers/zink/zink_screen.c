@@ -1353,6 +1353,11 @@ load_device_extensions(struct zink_screen *screen)
       GET_PROC_ADDR_KHR(UpdateDescriptorSetWithTemplate);
    }
 
+   if (screen->info.have_EXT_multi_draw) {
+      GET_PROC_ADDR(CmdDrawMultiEXT);
+      GET_PROC_ADDR(CmdDrawMultiIndexedEXT);
+   }
+
    screen->have_triangle_fans = true;
 #if defined(VK_EXTX_PORTABILITY_SUBSET_EXTENSION_NAME)
    if (screen->info.have_EXTX_portability_subset) {

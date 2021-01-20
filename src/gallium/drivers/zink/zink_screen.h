@@ -123,6 +123,9 @@ struct zink_screen {
    PFN_vkCmdDrawIndirectCount vk_CmdDrawIndirectCount;
    PFN_vkCmdDrawIndexedIndirectCount vk_CmdDrawIndexedIndirectCount;
 
+   PFN_vkCmdDrawMultiEXT vk_CmdDrawMultiEXT;
+   PFN_vkCmdDrawMultiIndexedEXT vk_CmdDrawMultiIndexedEXT;
+
    PFN_vkWaitSemaphores vk_WaitSemaphores;
 
    PFN_vkGetDescriptorSetLayoutSupport vk_GetDescriptorSetLayoutSupport;
