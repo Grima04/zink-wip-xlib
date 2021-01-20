@@ -313,10 +313,17 @@ draw_indexed(struct zink_context *ctx,
    } else {
       if (needs_drawid)
          update_drawid(ctx, draw_id);
-      for (unsigned i = 0; i < num_draws; i++)
-         vkCmdDrawIndexed(cmdbuf,
-            draws[i].count, dinfo->instance_count,
-            draws[i].start, draws[i].index_bias, dinfo->start_instance);
+      if (zink_screen(ctx->base.screen)->vk_CmdDrawMultiIndexedEXT)
+         zink_screen(ctx->base.screen)->vk_CmdDrawMultiIndexedEXT(cmdbuf, num_draws, (void*)draws,
+                                                                   dinfo->instance_count,
+                                                                   dinfo->start_instance, sizeof(struct pipe_draw_start_count_bias),
+                                                                   dinfo->index_bias_varies ? NULL : &draws[0].index_bias);
+      else {
+         for (unsigned i = 0; i < num_draws; i++)
+            vkCmdDrawIndexed(cmdbuf,
+               draws[i].count, dinfo->instance_count,
+               draws[i].start, draws[i].index_bias, dinfo->start_instance);
+      }
    }
 }
 
@@ -338,8 +345,15 @@ draw(struct zink_context *ctx,
    } else {
       if (needs_drawid)
          update_drawid(ctx, draw_id);
-      for (unsigned i = 0; i < num_draws; i++)
-         vkCmdDraw(cmdbuf, draws[i].count, dinfo->instance_count, draws[i].start, dinfo->start_instance);
+      if (zink_screen(ctx->base.screen)->vk_CmdDrawMultiEXT)
+         zink_screen(ctx->base.screen)->vk_CmdDrawMultiEXT(cmdbuf, num_draws, (void*)draws,
+                                                            dinfo->instance_count, dinfo->start_instance,
+                                                            sizeof(struct pipe_draw_start_count_bias));
+      else {
+         for (unsigned i = 0; i < num_draws; i++)
+            vkCmdDraw(cmdbuf, draws[i].count, dinfo->instance_count, draws[i].start, dinfo->start_instance);
+
+      }
    }
 }
 
