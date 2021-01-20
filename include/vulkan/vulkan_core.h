@@ -821,6 +821,8 @@ typedef enum VkStructureType {
     VK_STRUCTURE_TYPE_SCREEN_SURFACE_CREATE_INFO_QNX = 1000378000,
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT = 1000381000,
     VK_STRUCTURE_TYPE_PIPELINE_COLOR_WRITE_CREATE_INFO_EXT = 1000381001,
+    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTI_DRAW_FEATURES_EXT = 1000392000,
+    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTI_DRAW_PROPERTIES_EXT = 1000392001,
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTER_FEATURES = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES,
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETER_FEATURES = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES,
     VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
@@ -12201,6 +12203,54 @@ VKAPI_ATTR void                                    VKAPI_CALL vkCmdSetColorWrite
     const VkBool32*                             pColorWriteEnables);
 #endif
 
+#define VK_EXT_multi_draw 1
+#define VK_EXT_MULTI_DRAW_SPEC_VERSION    1
+#define VK_EXT_MULTI_DRAW_EXTENSION_NAME  "VK_EXT_multi_draw"
+typedef struct VkPhysicalDeviceMultiDrawFeaturesEXT {
+    VkStructureType    sType;
+    void*              pNext;
+    VkBool32           multiDraw;
+} VkPhysicalDeviceMultiDrawFeaturesEXT;
+
+
+typedef struct VkPhysicalDeviceMultiDrawPropertiesEXT {
+    VkStructureType    sType;
+    void*              pNext;
+    uint32_t           maxMultiDrawCount;
+} VkPhysicalDeviceMultiDrawPropertiesEXT;
+
+typedef struct VkMultiDrawInfoEXT {
+    uint32_t    first;
+    uint32_t    count;
+} VkMultiDrawInfoEXT;
+
+typedef struct VkMultiDrawIndexedInfoEXT {
+    uint32_t    first;
+    uint32_t    count;
+    int32_t     offset;
+} VkMultiDrawIndexedInfoEXT;
+
+typedef void (VKAPI_PTR *PFN_vkCmdDrawMultiEXT)(VkCommandBuffer commandBuffer, uint32_t drawCount, const VkMultiDrawInfoEXT* pVertexInfo, uint32_t instanceCount, uint32_t firstInstance, uint32_t stride);
+typedef void (VKAPI_PTR *PFN_vkCmdDrawMultiIndexedEXT)(VkCommandBuffer commandBuffer, uint32_t drawCount, const VkMultiDrawIndexedInfoEXT* pIndexInfo, uint32_t instanceCount, uint32_t firstInstance, uint32_t stride, const int32_t* pVertexOffset);
+
+#ifndef VK_NO_PROTOTYPES
+VKAPI_ATTR void VKAPI_CALL vkCmdDrawMultiEXT(
+    VkCommandBuffer                             commandBuffer,
+    uint32_t                                    drawCount,
+    const VkMultiDrawInfoEXT*                   pVertexInfo,
+    uint32_t                                    instanceCount,
+    uint32_t                                    firstInstance,
+    uint32_t                                    stride);
+
+VKAPI_ATTR void VKAPI_CALL vkCmdDrawMultiIndexedEXT(
+    VkCommandBuffer                             commandBuffer,
+    uint32_t                                    drawCount,
+    const VkMultiDrawIndexedInfoEXT*            pIndexInfo,
+    uint32_t                                    instanceCount,
+    uint32_t                                    firstInstance,
+    uint32_t                                    stride,
+    const int32_t*                              pVertexOffset);
+#endif
 
 #define VK_KHR_acceleration_structure 1
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkAccelerationStructureKHR)

@@ -8098,6 +8098,25 @@ typedef void <name>CAMetalLayer</name>;
             <param><type>uint32_t</type> <name>firstInstance</name></param>
         </command>
         <command queues="graphics" renderpass="inside" cmdbufferlevel="primary,secondary" pipeline="graphics">
+            <proto><type>void</type> <name>vkCmdDrawMultiEXT</name></proto>
+            <param externsync="true"><type>VkCommandBuffer</type> <name>commandBuffer</name></param>
+            <param optional="true"><type>uint32_t</type> <name>drawCount</name></param>
+            <param noautovalidity="true" len="drawCount">const <type>VkMultiDrawInfoEXT</type>* <name>pVertexInfo</name></param>
+            <param><type>uint32_t</type> <name>instanceCount</name></param>
+            <param><type>uint32_t</type> <name>firstInstance</name></param>
+            <param><type>uint32_t</type> <name>stride</name></param>
+        </command>
+        <command queues="graphics" renderpass="inside" cmdbufferlevel="primary,secondary" pipeline="graphics">
+            <proto><type>void</type> <name>vkCmdDrawMultiIndexedEXT</name></proto>
+            <param externsync="true"><type>VkCommandBuffer</type> <name>commandBuffer</name></param>
+            <param optional="true"><type>uint32_t</type> <name>drawCount</name></param>
+            <param noautovalidity="true" len="drawCount">const <type>VkMultiDrawIndexedInfoEXT</type>* <name>pIndexInfo</name></param>
+            <param><type>uint32_t</type> <name>instanceCount</name></param>
+            <param><type>uint32_t</type> <name>firstInstance</name></param>
+            <param><type>uint32_t</type> <name>stride</name></param>
+            <param>const <type>int32_t</type>* <name>pVertexOffset</name></param>
+        </command>
+        <command queues="graphics" renderpass="inside" cmdbufferlevel="primary,secondary" pipeline="graphics">
             <proto><type>void</type> <name>vkCmdDrawIndirect</name></proto>
             <param externsync="true"><type>VkCommandBuffer</type> <name>commandBuffer</name></param>
             <param><type>VkBuffer</type> <name>buffer</name></param>
@@ -16046,10 +16065,18 @@ typedef void <name>CAMetalLayer</name>;
                 <enum value="&quot;VK_EXT_extension_392&quot;"              name="VK_EXT_EXTENSION_392_EXTENSION_NAME"/>
             </require>
         </extension>
-        <extension name="VK_MESA_multi_draw" number="393" author="MESA" contact="Mike Blumenkrantz @zmike" type="device" supported="disabled">
+        <extension name="VK_EXT_multi_draw" number="393" author="EXT" contact="Mike Blumenkrantz @zmike" type="device" supported="vulkan">
             <require>
-                <enum value="0"                                             name="VK_MESA_MULTI_DRAW_SPEC_VERSION"/>
-                <enum value="&quot;VK_MESA_multi_draw&quot;"                name="VK_MESA_MULTI_DRAW_EXTENSION_NAME"/>
+                <enum value="1"                                         name="VK_EXT_MULTI_DRAW_SPEC_VERSION"/>
+                <enum value="&quot;VK_EXT_multi_draw&quot;"             name="VK_EXT_MULTI_DRAW_EXTENSION_NAME"/>
+                <enum offset="0" extends="VkStructureType"                 name="VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTI_DRAW_FEATURES_EXT"/>
+                <enum offset="1" extends="VkStructureType"              name="VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTI_DRAW_PROPERTIES_EXT"/>
+                <type name="VkPhysicalDeviceMultiDrawFeaturesEXT"/>
+                <type name="VkPhysicalDeviceMultiDrawPropertiesEXT"/>
+                <command name="vkCmdDrawMultiEXT"/>
+                <command name="vkCmdDrawMultiIndexedEXT"/>
+                <type name="VkMultiDrawInfoEXT"/>
+                <type name="VkMultiDrawIndexedInfoEXT"/>
             </require>
         </extension>
         <extension name="VK_EXT_extension_394" number="394" author="EXT" contact="Mike Blumenkrantz @zmike" type="device" supported="disabled">
