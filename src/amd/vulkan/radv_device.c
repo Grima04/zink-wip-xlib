@@ -512,6 +512,7 @@ radv_physical_device_get_supported_extensions(const struct radv_physical_device 
       .GOOGLE_decorate_string = true,
       .GOOGLE_hlsl_functionality1 = true,
       .GOOGLE_user_type = true,
+      .EXT_multi_draw = device->rad_info.chip_class >= GFX10,
       .NV_compute_shader_derivatives = true,
       .VALVE_mutable_descriptor_type = true,
    };
@@ -1588,6 +1589,7 @@ radv_GetPhysicalDeviceFeatures2(VkPhysicalDevice physicalDevice,
          features->extendedDynamicState2PatchControlPoints = false;
          break;
       }
+      VK_UTIL_MULTIDRAW_FEATS(ext)
       default:
          break;
       }
@@ -2260,6 +2262,7 @@ radv_GetPhysicalDeviceProperties2(VkPhysicalDevice physicalDevice,
          props->transformFeedbackPreservesTriangleFanProvokingVertex = true;
          break;
       }
+      VK_UTIL_MULTIDRAW_PROPS_MAXDRAWCOUNT2048(ext)
       default:
          break;
       }
