@@ -111,6 +111,8 @@ struct zink_screen {
 
    uint32_t cur_custom_border_color_samplers;
 
+   void *renderdoc_api;
+
    bool needs_mesa_wsi;
    bool needs_mesa_flush_wsi;
 
