@@ -140,6 +140,7 @@ static const struct vk_device_extension_table lvp_device_extensions_supported = 
    .EXT_provoking_vertex                  = true,
    .GOOGLE_decorate_string                = true,
    .GOOGLE_hlsl_functionality1            = true,
+   .EXT_multi_draw                        = true,
 };
 
 static VkResult VKAPI_CALL
@@ -644,6 +645,7 @@ VKAPI_ATTR void VKAPI_CALL lvp_GetPhysicalDeviceFeatures2(
          features->transformFeedbackPreservesProvokingVertex = true;
          break;
       }
+      VK_UTIL_MULTIDRAW_FEATS(ext)
       default:
          break;
       }
@@ -968,6 +970,7 @@ VKAPI_ATTR void VKAPI_CALL lvp_GetPhysicalDeviceProperties2(
          properties->transformFeedbackPreservesTriangleFanProvokingVertex = true;
          break;
       }
+      VK_UTIL_MULTIDRAW_PROPS_MAXDRAWCOUNT2048(ext)
       default:
          break;
       }
