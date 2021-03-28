@@ -75,6 +75,18 @@ struct zink_descriptor_set {
    };
 };
 
+struct zink_program_descriptor_data_cached {
+   struct zink_program_descriptor_data base;
+   struct zink_descriptor_pool *pool[ZINK_DESCRIPTOR_TYPES];
+   struct zink_descriptor_set *last_set[ZINK_DESCRIPTOR_TYPES];
+};
+
+
+static inline struct zink_program_descriptor_data_cached *
+pdd_cached(struct zink_program *pg)
+{
+   return (struct zink_program_descriptor_data_cached*)pg->dd;
+}
 
 static bool
 batch_add_desc_set(struct zink_batch *batch, struct zink_descriptor_set *zds)
@@ -518,7 +530,7 @@ allocate_desc_set(struct zink_context *ctx, struct zink_program *pg, enum zink_d
 {
    struct zink_screen *screen = zink_screen(ctx->base.screen);
    bool push_set = type == ZINK_DESCRIPTOR_TYPES;
-   struct zink_descriptor_pool *pool = push_set ? ctx->dd->push_pool[is_compute] : pg->dd->pool[type];
+   struct zink_descriptor_pool *pool = push_set ? ctx->dd->push_pool[is_compute] : pdd_cached(pg)->pool[type];
 #define DESC_BUCKET_FACTOR 10
    unsigned bucket_size = pool->key.layout->num_descriptors ? DESC_BUCKET_FACTOR : 1;
    if (pool->key.layout->num_descriptors) {
@@ -614,7 +626,7 @@ zink_descriptor_set_get(struct zink_context *ctx,
    struct zink_program *pg = is_compute ? (struct zink_program *)ctx->curr_compute : (struct zink_program *)ctx->curr_program;
    struct zink_batch *batch = &ctx->batch;
    bool push_set = type == ZINK_DESCRIPTOR_TYPES;
-   struct zink_descriptor_pool *pool = push_set ? ctx->dd->push_pool[is_compute] : pg->dd->pool[type];
+   struct zink_descriptor_pool *pool = push_set ? ctx->dd->push_pool[is_compute] : pdd_cached(pg)->pool[type];
    unsigned descs_used = 1;
    assert(type <= ZINK_DESCRIPTOR_TYPES);
 
@@ -626,7 +638,7 @@ zink_descriptor_set_get(struct zink_context *ctx,
    populate_zds_key(ctx, type, is_compute, &key, pg->dd->push_usage);
 
    simple_mtx_lock(&pool->mtx);
-   struct zink_descriptor_set *last_set = push_set ? ctx->dd->last_set[is_compute] : pg->dd->last_set[type];
+   struct zink_descriptor_set *last_set = push_set ? ctx->dd->last_set[is_compute] : pdd_cached(pg)->last_set[type];
    if (last_set && last_set->hash == hash && desc_state_equal(&last_set->key, &key)) {
       zds = last_set;
       *cache_hit = !zds->invalid;
@@ -715,7 +727,7 @@ quick_out:
    if (push_set)
       ctx->dd->last_set[is_compute] = zds;
    else
-      pg->dd->last_set[type] = zds;
+      pdd_cached(pg)->last_set[type] = zds;
    simple_mtx_unlock(&pool->mtx);
 
    return zds;
@@ -823,6 +835,10 @@ zink_descriptor_program_init(struct zink_context *ctx, struct zink_program *pg)
 {
    struct zink_screen *screen = zink_screen(ctx->base.screen);
 
+   pg->dd = (void*)rzalloc(pg, struct zink_program_descriptor_data_cached);
+   if (!pg->dd)
+      return false;
+
    if (!zink_descriptor_program_init_lazy(ctx, pg))
       return false;
 
@@ -836,11 +852,14 @@ zink_descriptor_program_init(struct zink_context *ctx, struct zink_program *pg)
 
       unsigned idx = zink_descriptor_type_to_size_idx(i);
       VkDescriptorPoolSize *size = &pg->dd->sizes[idx];
+      /* this is a sampler/image set with no images only texels */
+      if (!size->descriptorCount)
+         size++;
       unsigned num_sizes = zink_descriptor_program_num_sizes(pg, i);
       struct zink_descriptor_pool *pool = descriptor_pool_get(ctx, i, pg->dd->layout_key[i], size, num_sizes);
       if (!pool)
          return false;
-      zink_descriptor_pool_reference(screen, &pg->dd->pool[i], pool);
+      zink_descriptor_pool_reference(screen, &pdd_cached(pg)->pool[i], pool);
    }
 
    return true;
@@ -852,7 +871,7 @@ zink_descriptor_program_deinit(struct zink_screen *screen, struct zink_program *
    if (!pg->dd)
       return;
    for (unsigned i = 0; i < ZINK_DESCRIPTOR_TYPES; i++)
-      zink_descriptor_pool_reference(screen, &pg->dd->pool[i], NULL);
+      zink_descriptor_pool_reference(screen, &pdd_cached(pg)->pool[i], NULL);
 
    zink_descriptor_program_deinit_lazy(screen, pg);
 }
@@ -1111,7 +1130,7 @@ zink_descriptors_update(struct zink_context *ctx, bool is_compute)
    for (int h = 0; h < ZINK_DESCRIPTOR_TYPES; h++) {
       if (pg->dsl[h + 1]) {
          /* null set has null pool */
-         if (pg->dd->pool[h])
+         if (pdd_cached(pg)->pool[h])
             zds[h] = zink_descriptor_set_get(ctx, h, is_compute, &cache_hit[h]);
          else
             zds[h] = NULL;

@@ -121,12 +121,11 @@ struct zink_descriptor_data {
 };
 
 struct zink_program_descriptor_data {
-   struct zink_descriptor_pool *pool[ZINK_DESCRIPTOR_TYPES];
-   struct zink_descriptor_set *last_set[ZINK_DESCRIPTOR_TYPES];
    uint8_t push_usage;
    VkDescriptorPoolSize sizes[6]; //zink_descriptor_size_index
    struct zink_descriptor_layout_key *layout_key[ZINK_DESCRIPTOR_TYPES]; //push set doesn't need one
    uint8_t binding_usage;
+   VkDescriptorUpdateTemplateKHR templates[ZINK_DESCRIPTOR_TYPES + 1];
 };
 
 struct zink_batch_descriptor_data {
