@@ -5241,14 +5241,18 @@ radv_cs_emit_draw_packet(struct radv_cmd_buffer *cmd_buffer, uint32_t vertex_cou
  */
 static void
 radv_cs_emit_draw_indexed_packet(struct radv_cmd_buffer *cmd_buffer, uint64_t index_va,
-                                 uint32_t max_index_count, uint32_t index_count)
+                                 uint32_t max_index_count, uint32_t index_count, bool not_eop)
 {
    radeon_emit(cmd_buffer->cs, PKT3(PKT3_DRAW_INDEX_2, 4, cmd_buffer->state.predicating));
    radeon_emit(cmd_buffer->cs, max_index_count);
    radeon_emit(cmd_buffer->cs, index_va);
    radeon_emit(cmd_buffer->cs, index_va >> 32);
    radeon_emit(cmd_buffer->cs, index_count);
-   radeon_emit(cmd_buffer->cs, V_0287F0_DI_SRC_SEL_DMA);
+   /* NOT_EOP allows merging multiple draws into 1 wave, but only user VGPRs
+    * can be changed between draws and GS fast launch must be disabled.
+    * NOT_EOP doesn't work on gfx9 and older.
+    */
+   radeon_emit(cmd_buffer->cs, V_0287F0_DI_SRC_SEL_DMA | S_0287F0_NOT_EOP(not_eop));
 }
 
 /* MUST inline this function to avoid massive perf loss in drawoverhead */
@@ -5353,6 +5357,7 @@ radv_emit_draw_packets_indexed(struct radv_cmd_buffer *cmd_buffer,
    struct radv_cmd_state *state = &cmd_buffer->state;
    struct radeon_cmdbuf *cs = cmd_buffer->cs;
    const int index_size = radv_get_vgt_index_size(state->index_type);
+   const bool uses_drawid = state->pipeline->graphics.uses_drawid;
 
    if (vertexOffset) {
       radv_emit_userdata_vertex(cmd_buffer, info, *vertexOffset);
@@ -5367,12 +5372,12 @@ radv_emit_draw_packets_indexed(struct radv_cmd_buffer *cmd_buffer,
          const uint64_t index_va = state->index_va + draw->first * index_size;
 
          if (!state->subpass->view_mask) {
-            radv_cs_emit_draw_indexed_packet(cmd_buffer, index_va, remaining_indexes, draw->count);
+            radv_cs_emit_draw_indexed_packet(cmd_buffer, index_va, remaining_indexes, draw->count, !uses_drawid && i < drawCount - 1);
          } else {
             u_foreach_bit(view, state->subpass->view_mask) {
                radv_emit_view_index(cmd_buffer, view);
 
-               radv_cs_emit_draw_indexed_packet(cmd_buffer, index_va, remaining_indexes, draw->count);
+               radv_cs_emit_draw_indexed_packet(cmd_buffer, index_va, remaining_indexes, draw->count, false);
             }
          }
       );
@@ -5385,6 +5390,8 @@ radv_emit_draw_packets_indexed(struct radv_cmd_buffer *cmd_buffer,
              cmd_buffer->device->physical_device->rad_info.has_zero_index_buffer_bug)
             continue;
 
+         const VkMultiDrawIndexedInfoEXT *next = (void*)(i < drawCount - 1 ? ((uint8_t*)draw + stride) : NULL);
+         const bool offset_changes = next && next->offset != draw->offset;
          if (i > 0) {
             if (state->last_vertex_offset != draw->offset) {
                radeon_set_sh_reg(cs, state->pipeline->graphics.vtx_base_sgpr, draw->offset);
@@ -5396,12 +5403,12 @@ radv_emit_draw_packets_indexed(struct radv_cmd_buffer *cmd_buffer,
          const uint64_t index_va = state->index_va + draw->first * index_size;
 
          if (!state->subpass->view_mask) {
-            radv_cs_emit_draw_indexed_packet(cmd_buffer, index_va, remaining_indexes, draw->count);
+            radv_cs_emit_draw_indexed_packet(cmd_buffer, index_va, remaining_indexes, draw->count, !offset_changes && !uses_drawid && i < drawCount - 1);
          } else {
             u_foreach_bit(view, state->subpass->view_mask) {
                radv_emit_view_index(cmd_buffer, view);
 
-               radv_cs_emit_draw_indexed_packet(cmd_buffer, index_va, remaining_indexes, draw->count);
+               radv_cs_emit_draw_indexed_packet(cmd_buffer, index_va, remaining_indexes, draw->count, false);
             }
          }
       );
