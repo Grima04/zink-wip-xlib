@@ -512,7 +512,7 @@ radv_physical_device_get_supported_extensions(const struct radv_physical_device 
       .GOOGLE_decorate_string = true,
       .GOOGLE_hlsl_functionality1 = true,
       .GOOGLE_user_type = true,
-      .EXT_multi_draw = device->rad_info.chip_class >= GFX10,
+      .EXT_multi_draw = true,
       .NV_compute_shader_derivatives = true,
       .VALVE_mutable_descriptor_type = true,
    };
