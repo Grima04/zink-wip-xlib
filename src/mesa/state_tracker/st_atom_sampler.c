@@ -215,8 +215,8 @@ st_convert_sampler(const struct st_context *st,
       if (st->emulate_argb) {
          sv = st_texture_get_current_sampler_view(st, stobj);
          if (sv) {
-            is_argb = util_format_is_argb(sv->view->format);
-            is_abgr = util_format_is_abgr(sv->view->format);
+            is_argb = util_format_is_argb(sv->view->format) || util_format_is_xrgb(sv->view->format);
+            is_abgr = util_format_is_abgr(sv->view->format) || util_format_is_xbgr(sv->view->format);
             if (is_argb || is_abgr) {
                st_translate_color(&msamp->Attrib.BorderColor, &tmp,
                          texBaseFormat, is_integer);
