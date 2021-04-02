@@ -906,7 +906,8 @@ zink_is_format_supported(struct pipe_screen *pscreen,
          if (!(props.bufferFeatures & VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT))
             return false;
          /* we can't swizzle these, so we can't sample from them either */
-         if (util_format_is_argb(format) || util_format_is_abgr(format))
+         if (util_format_is_argb(format) || util_format_is_abgr(format) ||
+             util_format_is_xrgb(format) || util_format_is_xbgr(format))
             return false;
       }
 
@@ -1158,6 +1159,26 @@ emulate_format(enum pipe_format format)
 
    case PIPE_FORMAT_R8G8B8X8_UNORM:
       return PIPE_FORMAT_R8G8B8A8_UNORM;
+
+   case PIPE_FORMAT_R16G16B16X16_FLOAT:
+      return PIPE_FORMAT_R16G16B16A16_FLOAT;
+   case PIPE_FORMAT_R16G16B16X16_SINT:
+      return PIPE_FORMAT_R16G16B16A16_SINT;
+   case PIPE_FORMAT_R16G16B16X16_SNORM:
+      return PIPE_FORMAT_R16G16B16A16_SNORM;
+   case PIPE_FORMAT_R16G16B16X16_UNORM:
+      return PIPE_FORMAT_R16G16B16A16_UNORM;
+
+   case PIPE_FORMAT_X8R8G8B8_UNORM:
+      return PIPE_FORMAT_R8G8B8A8_UNORM;
+   case PIPE_FORMAT_X8R8G8B8_SRGB:
+      return PIPE_FORMAT_R8G8B8A8_SRGB;
+   case PIPE_FORMAT_X8B8G8R8_UNORM:
+      return PIPE_FORMAT_B8G8R8A8_UNORM;
+   case PIPE_FORMAT_X8B8G8R8_SRGB:
+      return PIPE_FORMAT_B8G8R8A8_SRGB;
+   case PIPE_FORMAT_X8B8G8R8_SINT:
+      return PIPE_FORMAT_B8G8R8A8_SINT;
 
    case PIPE_FORMAT_A8R8G8B8_UNORM:
       return PIPE_FORMAT_R8G8B8A8_UNORM;
