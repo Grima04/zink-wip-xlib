@@ -1542,7 +1542,7 @@ setup_framebuffer(struct zink_context *ctx)
    struct zink_screen *screen = zink_screen(ctx->base.screen);
    struct zink_render_pass *rp = ctx->gfx_pipeline_state.render_pass;
 
-   if (ctx->sample_locations_enabled && ctx->sample_locations_changed) {
+   if (ctx->gfx_pipeline_state.sample_locations_enabled && ctx->sample_locations_changed) {
       unsigned samples = ctx->gfx_pipeline_state.rast_samples;
       unsigned idx = util_logbase2_ceil(MAX2(samples, 1));
       VkExtent2D grid_size = screen->maxSampleLocationGridSize[idx];
@@ -1670,6 +1670,19 @@ zink_init_vk_sample_locations(struct zink_context *ctx, VkSampleLocationsInfoEXT
    loc->sampleLocationsCount = ctx->gfx_pipeline_state.rast_samples;
    loc->sampleLocationGridSize = screen->maxSampleLocationGridSize[idx];
    loc->pSampleLocations = ctx->vk_sample_locations;
+}
+
+static void
+zink_evaluate_depth_buffer(struct pipe_context *pctx)
+{
+   struct zink_context *ctx = zink_context(pctx);
+
+   if (!ctx->fb_state.zsbuf)
+      return;
+
+   struct zink_resource *res = zink_resource(ctx->fb_state.zsbuf->texture);
+   res->obj->needs_zs_evaluate = true;
+   zink_init_vk_sample_locations(ctx, &res->obj->zs_evaluate);
 }
 
 void
@@ -1885,7 +1898,13 @@ zink_set_framebuffer_state(struct pipe_context *pctx,
    if (ctx->fb_state.zsbuf) {
       struct pipe_surface *surf = ctx->fb_state.zsbuf;
       if (surf != state->zsbuf) {
+         struct zink_resource *res = zink_resource(surf->texture);
          zink_fb_clears_apply(ctx, ctx->fb_state.zsbuf->texture);
+         if (unlikely(res->obj->needs_zs_evaluate))
+            /* have to flush zs eval while the sample location data still exists,
+             * so just throw some random barrier */
+            zink_resource_image_barrier(ctx, NULL, res, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                        VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
          ctx->rp_changed = true;
       }
       zink_resource(surf->texture)->fb_binds--;
@@ -1940,7 +1959,7 @@ zink_set_framebuffer_state(struct pipe_context *pctx,
    if ((ctx->gfx_pipeline_state.rast_samples > 1) != (rast_samples > 1))
       ctx->dirty_shader_stages |= 1 << PIPE_SHADER_FRAGMENT;
    if (ctx->gfx_pipeline_state.rast_samples != rast_samples) {
-      ctx->sample_locations_changed |= ctx->sample_locations_enabled;
+      ctx->sample_locations_changed |= ctx->gfx_pipeline_state.sample_locations_enabled;
       ctx->gfx_pipeline_state.dirty = true;
    }
    ctx->gfx_pipeline_state.rast_samples = rast_samples;
@@ -2144,7 +2163,7 @@ zink_resource_image_barrier_init(VkImageMemoryBarrier *imb, struct zink_resource
       res->obj->image,
       isr
    };
-   return zink_resource_image_needs_barrier(res, new_layout, flags, pipeline);
+   return res->obj->needs_zs_evaluate || zink_resource_image_needs_barrier(res, new_layout, flags, pipeline);
 }
 
 static inline bool
@@ -2198,6 +2217,9 @@ zink_resource_image_barrier(struct zink_context *ctx, struct zink_batch *batch, 
    /* only barrier if we're changing layout or doing something besides read -> read */
    VkCommandBuffer cmdbuf = get_cmdbuf(ctx, res);
    assert(new_layout);
+   if (res->obj->needs_zs_evaluate)
+      imb.pNext = &res->obj->zs_evaluate;
+   res->obj->needs_zs_evaluate = false;
    vkCmdPipelineBarrier(
       cmdbuf,
       res->access_stage ? res->access_stage : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -3384,6 +3406,7 @@ zink_context_create(struct pipe_screen *pscreen, void *priv, unsigned flags)
    ctx->base.flush = zink_flush;
    ctx->base.memory_barrier = zink_memory_barrier;
    ctx->base.texture_barrier = zink_texture_barrier;
+   ctx->base.evaluate_depth_buffer = zink_evaluate_depth_buffer;
 
    ctx->base.resource_commit = zink_resource_commit;
    ctx->base.resource_copy_region = zink_resource_copy_region;
