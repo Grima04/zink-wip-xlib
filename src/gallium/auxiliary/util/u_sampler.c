@@ -133,10 +133,10 @@ void
 u_sampler_view_swizzle_argb(struct pipe_sampler_view *view,
                             enum pipe_format dst_format)
 {
-   bool src_is_argb = util_format_is_argb(view->format);
-   bool src_is_abgr = util_format_is_abgr(view->format);
-   bool dst_is_argb = util_format_is_argb(dst_format);
-   bool dst_is_abgr = util_format_is_abgr(dst_format);
+   bool src_is_argb = util_format_is_argb(view->format) || util_format_is_xrgb(view->format);
+   bool src_is_abgr = util_format_is_abgr(view->format) || util_format_is_xbgr(view->format);
+   bool dst_is_argb = util_format_is_argb(dst_format) || util_format_is_xrgb(dst_format);
+   bool dst_is_abgr = util_format_is_abgr(dst_format) || util_format_is_xbgr(dst_format);
 
    if (src_is_argb == dst_is_argb && src_is_abgr == dst_is_abgr)
       return;
