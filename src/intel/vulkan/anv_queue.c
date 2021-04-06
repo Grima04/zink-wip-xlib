@@ -1316,6 +1316,7 @@ VkResult anv_QueueSubmit(
    if (device->no_hw)
       return VK_SUCCESS;
 
+   anv_measure_acquire(device);
    /* Query for device status prior to submitting.  Technically, we don't need
     * to do this.  However, if we have a client that's submitting piles of
     * garbage, we would rather break as early as possible to keep the GPU
