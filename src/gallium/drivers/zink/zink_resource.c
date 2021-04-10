@@ -50,6 +50,7 @@
 #endif
 
 #ifdef ZINK_USE_DMABUF
+#include <xf86drm.h>
 #include "drm-uapi/drm_fourcc.h"
 #endif
 
@@ -496,6 +497,9 @@ resource_object_create(struct zink_screen *screen, const struct pipe_resource *t
 
    VkMemoryRequirements reqs = {};
    VkMemoryPropertyFlags flags;
+   VkExternalMemoryHandleTypeFlags external = 0;
+   if (screen->info.have_EXT_external_memory_dma_buf)
+      external |= VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
    bool scanout = templ->bind & PIPE_BIND_SCANOUT;
    bool shared = templ->bind & PIPE_BIND_SHARED;
 
@@ -532,7 +536,7 @@ resource_object_create(struct zink_screen *screen, const struct pipe_resource *t
 
       if (templ->bind & PIPE_BIND_SHARED) {
          emici.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
-         emici.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+         emici.handleTypes = external;
          ici.pNext = &emici;
 
          assert(ici.tiling != VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT || mod != DRM_FORMAT_MOD_INVALID);
@@ -636,7 +640,7 @@ resource_object_create(struct zink_screen *screen, const struct pipe_resource *t
       .buffer = VK_NULL_HANDLE,
    };
 
-   if (screen->info.have_KHR_dedicated_allocation && templ->bind & PIPE_BIND_SCANOUT) {
+   if (screen->info.have_KHR_dedicated_allocation && (scanout || shared)) {
       ded_alloc_info.pNext = mai.pNext;
       mai.pNext = &ded_alloc_info;
    }
@@ -644,7 +648,7 @@ resource_object_create(struct zink_screen *screen, const struct pipe_resource *t
    VkExportMemoryAllocateInfo emai = {};
    if (templ->bind & PIPE_BIND_SHARED && shared) {
       emai.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
-      emai.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+      emai.handleTypes = external;
 
       emai.pNext = mai.pNext;
       mai.pNext = &emai;
@@ -655,9 +659,9 @@ resource_object_create(struct zink_screen *screen, const struct pipe_resource *t
       NULL,
    };
 
-   if (whandle && whandle->type == WINSYS_HANDLE_TYPE_FD) {
+   if (whandle && (whandle->type == WINSYS_HANDLE_TYPE_FD || whandle->type == WINSYS_HANDLE_TYPE_KMS)) {
       imfi.pNext = NULL;
-      imfi.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+      imfi.handleType = external;
       imfi.fd = whandle->handle;
 
       imfi.pNext = mai.pNext;
@@ -914,17 +918,27 @@ zink_resource_get_handle(struct pipe_screen *pscreen,
    //TODO: remove for wsi
    struct zink_resource_object *obj = res->scanout_obj ? res->scanout_obj : res->obj;
 
-   if (whandle->type == WINSYS_HANDLE_TYPE_FD) {
+   if (whandle->type == WINSYS_HANDLE_TYPE_FD || whandle->type == WINSYS_HANDLE_TYPE_KMS) {
 #ifdef ZINK_USE_DMABUF
       VkMemoryGetFdInfoKHR fd_info = {};
       int fd;
       fd_info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
       //TODO: remove for wsi
       fd_info.memory = obj->mem;
-      fd_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+      if (whandle->type == WINSYS_HANDLE_TYPE_FD)
+         fd_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+      else
+         fd_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
       VkResult result = (*screen->vk_GetMemoryFdKHR)(screen->dev, &fd_info, &fd);
       if (result != VK_SUCCESS)
          return false;
+      if (whandle->type == WINSYS_HANDLE_TYPE_KMS) {
+         uint32_t h;
+         if (drmPrimeFDToHandle(screen->drm_fd, fd, &h)) {
+            return false;
+         }
+         fd = h;
+      }
       whandle->handle = fd;
       uint64_t value;
       zink_resource_get_param(pscreen, context, tex, 0, 0, 0, PIPE_RESOURCE_PARAM_MODIFIER, 0, &value);
