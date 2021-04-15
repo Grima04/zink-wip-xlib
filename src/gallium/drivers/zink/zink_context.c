@@ -372,7 +372,7 @@ zink_create_sampler_state(struct pipe_context *pctx,
    return sampler;
 }
 
-static VkImageLayout
+ALWAYS_INLINE static VkImageLayout
 get_layout_for_binding(struct zink_resource *res, enum zink_descriptor_type type)
 {
    if (res->obj->is_buffer)
@@ -397,7 +397,7 @@ get_layout_for_binding(struct zink_resource *res, enum zink_descriptor_type type
    return 0;
 }
 
-static struct zink_surface *
+ALWAYS_INLINE static struct zink_surface *
 get_imageview_for_binding(struct zink_context *ctx, enum pipe_shader_type stage, enum zink_descriptor_type type, unsigned idx)
 {
    switch (type) {
@@ -416,7 +416,7 @@ get_imageview_for_binding(struct zink_context *ctx, enum pipe_shader_type stage,
    return VK_NULL_HANDLE;
 }
 
-static struct zink_buffer_view *
+ALWAYS_INLINE static struct zink_buffer_view *
 get_bufferview_for_binding(struct zink_context *ctx, enum pipe_shader_type stage, enum zink_descriptor_type type, unsigned idx)
 {
    switch (type) {
@@ -435,7 +435,7 @@ get_bufferview_for_binding(struct zink_context *ctx, enum pipe_shader_type stage
    return VK_NULL_HANDLE;
 }
 
-static void
+ALWAYS_INLINE static void
 update_descriptor_state(struct zink_context *ctx, enum pipe_shader_type shader, enum zink_descriptor_type type, unsigned slot)
 {
    struct zink_screen *screen = zink_screen(ctx->base.screen);
@@ -826,7 +826,7 @@ zink_set_polygon_stipple(struct pipe_context *pctx,
 {
 }
 
-static inline void
+ALWAYS_INLINE static void
 update_res_bind_count(struct zink_context *ctx, struct zink_resource *res, bool is_compute, bool decrement)
 {
    if (decrement) {
@@ -837,7 +837,7 @@ update_res_bind_count(struct zink_context *ctx, struct zink_resource *res, bool 
       res->bind_count[is_compute]++;
 }
 
-static void
+ALWAYS_INLINE static void
 update_existing_vbo(struct zink_context *ctx, unsigned slot)
 {
    if (!ctx->vertex_buffers[slot].buffer.resource)
@@ -945,7 +945,7 @@ zink_set_inlinable_constants(struct pipe_context *pctx,
    ctx->inlinable_uniforms_valid_mask |= 1 << shader;
 }
 
-static inline void
+ALWAYS_INLINE static void
 unbind_ubo(struct zink_context *ctx, struct zink_resource *res, bool is_compute)
 {
    if (!res)
@@ -1028,7 +1028,7 @@ zink_set_constant_buffer(struct pipe_context *pctx,
       zink_screen(pctx->screen)->context_invalidate_descriptor_state(ctx, shader, ZINK_DESCRIPTOR_TYPE_UBO, index, 1);
 }
 
-static inline void
+ALWAYS_INLINE static void
 unbind_ssbo(struct zink_context *ctx, struct zink_resource *res, bool is_compute, bool writable)
 {
    if (!res)
@@ -1240,7 +1240,7 @@ zink_set_shader_images(struct pipe_context *pctx,
       zink_screen(pctx->screen)->context_invalidate_descriptor_state(ctx, p_stage, ZINK_DESCRIPTOR_TYPE_IMAGE, start_slot, count);
 }
 
-static void
+ALWAYS_INLINE static void
 unbind_samplerview(struct zink_context *ctx, enum pipe_shader_type stage, unsigned slot)
 {
    struct zink_sampler_view *sv = zink_sampler_view(ctx->sampler_views[stage][slot]);
