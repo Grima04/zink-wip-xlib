@@ -1025,8 +1025,20 @@ invalidate_buffer(struct zink_context *ctx, struct zink_resource *res)
 static void
 zink_resource_invalidate(struct pipe_context *pctx, struct pipe_resource *pres)
 {
+   struct zink_context *ctx = zink_context(pctx);
+   struct zink_resource *res = zink_resource(pres);
    if (pres->target == PIPE_BUFFER)
-      invalidate_buffer(zink_context(pctx), zink_resource(pres));
+      invalidate_buffer(ctx, res);
+   else {
+      /* from DiscardFramebuffer */
+      if (res->fb_binds && res->base.b.bind & PIPE_BIND_SCANOUT) {
+         if (!ctx->new_swapchain) {
+            ctx->rp_changed = true;
+            zink_batch_no_rp(ctx);
+         }
+         ctx->new_swapchain = true;
+      }
+   }
 }
 
 static void
