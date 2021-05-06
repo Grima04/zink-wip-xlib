@@ -611,7 +611,7 @@ zink_draw_vbo(struct pipe_context *pctx,
          debug_printf("BUG: wide lines not supported, needs fallback!");
    }
 
-   if (pipeline_changed || ctx->dsa_state_changed) {
+   if (pipeline_changed || ctx->stencil_ref_changed) {
       if (dsa_state->base.stencil[0].enabled) {
          if (dsa_state->base.stencil[1].enabled) {
             vkCmdSetStencilReference(batch->state->cmdbuf, VK_STENCIL_FACE_FRONT_BIT,
@@ -623,7 +623,10 @@ zink_draw_vbo(struct pipe_context *pctx,
                                      VK_STENCIL_FACE_FRONT_AND_BACK,
                                      ctx->stencil_ref.ref_value[0]);
       }
+      ctx->stencil_ref_changed = false;
+   }
 
+   if (pipeline_changed || ctx->dsa_state_changed) {
       if (screen->info.have_EXT_extended_dynamic_state) {
          screen->vk_CmdSetDepthBoundsTestEnableEXT(batch->state->cmdbuf, dsa_state->hw_state.depth_bounds_test);
          if (dsa_state->hw_state.depth_bounds_test)

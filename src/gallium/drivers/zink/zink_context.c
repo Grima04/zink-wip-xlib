@@ -1376,7 +1376,7 @@ zink_set_stencil_ref(struct pipe_context *pctx,
 {
    struct zink_context *ctx = zink_context(pctx);
    ctx->stencil_ref = ref;
-   ctx->dsa_state_changed |= !!ctx->dsa_state;
+   ctx->stencil_ref_changed = true;
 }
 
 static void
