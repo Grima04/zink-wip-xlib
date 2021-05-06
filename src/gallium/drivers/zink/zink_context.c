@@ -1376,6 +1376,7 @@ zink_set_stencil_ref(struct pipe_context *pctx,
 {
    struct zink_context *ctx = zink_context(pctx);
    ctx->stencil_ref = ref;
+   ctx->dsa_state_changed |= !!ctx->dsa_state;
 }
 
 static void
@@ -1815,6 +1816,7 @@ flush_batch(struct zink_context *ctx, bool sync)
       ctx->vp_state_changed = true;
       ctx->scissor_changed = true;
       ctx->rast_state_changed = true;
+      ctx->dsa_state_changed = true;
    }
 }
 
