@@ -1214,6 +1214,7 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
          u_upload_alloc(mgr, 0, box->width + box->x,
                      screen->info.props.limits.minMemoryMapAlignment, &offset,
                      (struct pipe_resource **)&trans->staging_res, (void **)&ptr);
+         assert(trans->staging_res);
          res = zink_resource(trans->staging_res);
          trans->offset = offset;
       } else {
