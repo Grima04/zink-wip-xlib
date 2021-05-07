@@ -97,6 +97,8 @@ struct zink_screen {
 
    simple_mtx_t mem_cache_mtx;
    struct hash_table *resource_mem_cache;
+   uint64_t mem_cache_size;
+   unsigned mem_cache_count;
 
    unsigned shader_id;
 
