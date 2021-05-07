@@ -1220,6 +1220,7 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
          res->bind_history &= ~ZINK_RESOURCE_USAGE_STREAMOUT;
       }
       ptr = map_resource(screen, res);
+      assert(ptr);
       if (!ptr)
          return NULL;
    }
