@@ -76,6 +76,7 @@ struct zink_batch_state {
    struct set *fbs;
    struct set *programs;
 
+   struct set *resources;
    struct set *surfaces;
    struct set *bufferviews;
 
