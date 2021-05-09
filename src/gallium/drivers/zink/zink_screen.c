@@ -144,7 +144,7 @@ disk_cache_init(struct zink_screen *screen)
    static char buf[1000];
    snprintf(buf, sizeof(buf), "zink_%x04x", screen->info.props.vendorID);
 
-   screen->disk_cache = disk_cache_create(buf, screen->info.props.deviceName, 0);
+   screen->disk_cache = disk_cache_create_single_file(buf, screen->info.props.deviceName, 0);
    if (screen->disk_cache)
       disk_cache_compute_key(screen->disk_cache, buf, strlen(buf), screen->disk_cache_key);
 #endif
