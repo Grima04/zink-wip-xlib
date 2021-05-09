@@ -32,6 +32,7 @@
 #include "util/slab.h"
 #include "compiler/nir/nir.h"
 #include "util/disk_cache.h"
+#include "util/disk_cache_os.h"
 #include "util/log.h"
 #include "util/simple_mtx.h"
 #include "util/u_queue.h"
@@ -95,7 +96,7 @@ struct zink_screen {
    VkPipelineCache pipeline_cache;
    size_t pipeline_cache_size;
    struct disk_cache *disk_cache;
-   cache_key disk_cache_key;
+   struct disk_cache_put_job dc_job;
    struct util_queue cache_thread;
 
    simple_mtx_t mem_cache_mtx;

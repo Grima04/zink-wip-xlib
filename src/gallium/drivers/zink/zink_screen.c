@@ -145,8 +145,10 @@ disk_cache_init(struct zink_screen *screen)
    snprintf(buf, sizeof(buf), "zink_%x04x", screen->info.props.vendorID);
 
    screen->disk_cache = disk_cache_create_single_file(buf, screen->info.props.deviceName, 0);
-   if (screen->disk_cache)
-      disk_cache_compute_key(screen->disk_cache, buf, strlen(buf), screen->disk_cache_key);
+   if (screen->disk_cache) {
+      disk_cache_compute_key(screen->disk_cache, buf, strlen(buf), screen->dc_job.key);
+      screen->dc_job.cache = screen->disk_cache;
+   }
 #endif
 }
 
@@ -165,7 +167,9 @@ cache_thread(void *data, int thread_index)
       return;
    if (vkGetPipelineCacheData(screen->dev, screen->pipeline_cache, &size, pipeline_data) == VK_SUCCESS) {
       screen->pipeline_cache_size = size;
-      disk_cache_put(screen->disk_cache, screen->disk_cache_key, pipeline_data, size, NULL);
+      screen->dc_job.data = pipeline_data;
+      screen->dc_job.size = size;
+      disk_cache_write_item_to_disk_foz(&screen->dc_job);
    }
    free(pipeline_data);
 }
@@ -1940,7 +1944,7 @@ zink_internal_create_screen(const struct pipe_screen_config *config)
    pcci.initialDataSize = 0;
    pcci.pInitialData = NULL;
    if (screen->disk_cache) {
-      pcci.pInitialData = disk_cache_get(screen->disk_cache, screen->disk_cache_key, &screen->pipeline_cache_size);
+      pcci.pInitialData = disk_cache_get(screen->disk_cache, screen->dc_job.key, &screen->pipeline_cache_size);
       pcci.initialDataSize = screen->pipeline_cache_size;
       util_queue_init(&screen->cache_thread, "zcq", 8, 1, UTIL_QUEUE_INIT_RESIZE_IF_FULL);
    }
