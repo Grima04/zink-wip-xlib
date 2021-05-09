@@ -235,6 +235,13 @@ disk_cache_create(const char *gpu_name, const char *driver_id,
                                      env_var_as_boolean("MESA_DISK_CACHE_SINGLE_FILE", false));
 }
 
+struct disk_cache *
+disk_cache_create_single_file(const char *gpu_name, const char *driver_id,
+                              uint64_t driver_flags)
+{
+   return disk_cache_create_internal(gpu_name, driver_id, driver_flags, true);
+}
+
 void
 disk_cache_destroy(struct disk_cache *cache)
 {
