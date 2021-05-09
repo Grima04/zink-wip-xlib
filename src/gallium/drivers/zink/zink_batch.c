@@ -299,9 +299,6 @@ zink_start_batch(struct zink_context *ctx, struct zink_batch *batch)
    if (ctx->last_fence) {
       struct zink_batch_state *last_state = zink_batch_state(ctx->last_fence);
       batch->last_batch_usage = &last_state->usage;
-   } else {
-      if (screen->threaded)
-         util_queue_init(&batch->flush_queue, "zfq", 8, 1, UTIL_QUEUE_INIT_RESIZE_IF_FULL);
    }
 
    if (screen->vk_CmdInsertDebugUtilsLabelEXT && screen->renderdoc_api) {
@@ -557,9 +554,9 @@ zink_end_batch(struct zink_context *ctx, struct zink_batch *batch)
    if (screen->device_lost)
       return;
 
-   if (util_queue_is_initialized(&batch->flush_queue)) {
+   if (screen->threaded) {
       batch->state->queue = screen->thread_queue;
-      util_queue_add_job(&batch->flush_queue, batch->state, &batch->state->flush_completed,
+      util_queue_add_job(&screen->flush_queue, batch->state, &batch->state->flush_completed,
                          submit_queue, post_submit, 0);
    } else {
       batch->state->queue = screen->queue;

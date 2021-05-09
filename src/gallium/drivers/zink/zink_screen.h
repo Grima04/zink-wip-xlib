@@ -78,6 +78,7 @@ struct zink_screen {
    uint32_t last_finished; //this is racy but ultimately doesn't matter
    VkSemaphore sem;
    VkSemaphore prev_sem;
+   struct util_queue flush_queue;
 
    bool device_lost;
    struct sw_winsys *winsys;
