@@ -150,25 +150,31 @@ disk_cache_init(struct zink_screen *screen)
 #endif
 }
 
-void
-zink_screen_update_pipeline_cache(struct zink_screen *screen)
-{
-   size_t size = 0;
 
-   if (!screen->disk_cache)
-      return;
+static void
+cache_thread(void *data, int thread_index)
+{
+   struct zink_screen *screen = data;
+   size_t size = 0;
    if (vkGetPipelineCacheData(screen->dev, screen->pipeline_cache, &size, NULL) != VK_SUCCESS)
       return;
    if (screen->pipeline_cache_size == size)
       return;
-   void *data = malloc(size);
-   if (!data)
+   void *pipeline_data = malloc(size);
+   if (!pipeline_data)
       return;
-   if (vkGetPipelineCacheData(screen->dev, screen->pipeline_cache, &size, data) == VK_SUCCESS) {
+   if (vkGetPipelineCacheData(screen->dev, screen->pipeline_cache, &size, pipeline_data) == VK_SUCCESS) {
       screen->pipeline_cache_size = size;
-      disk_cache_put(screen->disk_cache, screen->disk_cache_key, data, size, NULL);
+      disk_cache_put(screen->disk_cache, screen->disk_cache_key, pipeline_data, size, NULL);
    }
-   free(data);
+   free(pipeline_data);
+}
+
+void
+zink_screen_update_pipeline_cache(struct zink_screen *screen)
+{
+   if (screen->disk_cache)
+      util_queue_add_job(&screen->cache_thread, screen, NULL, cache_thread, NULL, 0);
 }
 
 static int
@@ -1029,8 +1035,11 @@ zink_destroy_screen(struct pipe_screen *pscreen)
    u_transfer_helper_destroy(pscreen->transfer_helper);
    zink_screen_update_pipeline_cache(screen);
 #ifdef ENABLE_SHADER_CACHE
-   if (screen->disk_cache)
+   if (screen->disk_cache) {
+      util_queue_finish(&screen->cache_thread);
       disk_cache_wait_for_idle(screen->disk_cache);
+      util_queue_destroy(&screen->cache_thread);
+   }
 #endif
    disk_cache_destroy(screen->disk_cache);
    simple_mtx_lock(&screen->mem_cache_mtx);
@@ -1930,6 +1939,7 @@ zink_internal_create_screen(const struct pipe_screen_config *config)
    if (screen->disk_cache) {
       pcci.pInitialData = disk_cache_get(screen->disk_cache, screen->disk_cache_key, &screen->pipeline_cache_size);
       pcci.initialDataSize = screen->pipeline_cache_size;
+      util_queue_init(&screen->cache_thread, "zcq", 8, 1, UTIL_QUEUE_INIT_RESIZE_IF_FULL);
    }
    vkCreatePipelineCache(screen->dev, &pcci, NULL, &screen->pipeline_cache);
    free((void*)pcci.pInitialData);
