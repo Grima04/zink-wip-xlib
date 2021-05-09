@@ -68,9 +68,9 @@ do {                                       \
    _dst += _src_size;                      \
 } while (0);
 
-struct disk_cache *
-disk_cache_create(const char *gpu_name, const char *driver_id,
-                  uint64_t driver_flags)
+static struct disk_cache *
+disk_cache_create_internal(const char *gpu_name, const char *driver_id,
+                           uint64_t driver_flags, bool single_file)
 {
    void *local;
    struct disk_cache *cache = NULL;
@@ -103,7 +103,7 @@ disk_cache_create(const char *gpu_name, const char *driver_id,
    goto path_fail;
 #endif
 
-   char *path = disk_cache_generate_cache_dir(local, gpu_name, driver_id);
+   char *path = disk_cache_generate_cache_dir(local, gpu_name, driver_id, single_file);
    if (!path)
       goto path_fail;
 
@@ -111,7 +111,8 @@ disk_cache_create(const char *gpu_name, const char *driver_id,
    if (cache->path == NULL)
       goto path_fail;
 
-   if (env_var_as_boolean("MESA_DISK_CACHE_SINGLE_FILE", false)) {
+   cache->single_file = single_file;
+   if (cache->single_file) {
       if (!disk_cache_load_cache_index(local, cache))
          goto path_fail;
    }
@@ -226,6 +227,14 @@ disk_cache_create(const char *gpu_name, const char *driver_id,
    return NULL;
 }
 
+struct disk_cache *
+disk_cache_create(const char *gpu_name, const char *driver_id,
+                  uint64_t driver_flags)
+{
+   return disk_cache_create_internal(gpu_name, driver_id, driver_flags,
+                                     env_var_as_boolean("MESA_DISK_CACHE_SINGLE_FILE", false));
+}
+
 void
 disk_cache_destroy(struct disk_cache *cache)
 {
@@ -233,7 +242,7 @@ disk_cache_destroy(struct disk_cache *cache)
       util_queue_finish(&cache->cache_queue);
       util_queue_destroy(&cache->cache_queue);
 
-      if (env_var_as_boolean("MESA_DISK_CACHE_SINGLE_FILE", false))
+      if (cache->single_file)
          foz_destroy(&cache->foz_db);
 
       disk_cache_destroy_mmap(cache);
@@ -324,7 +333,7 @@ cache_put(void *job, int thread_index)
    char *filename = NULL;
    struct disk_cache_put_job *dc_job = (struct disk_cache_put_job *) job;
 
-   if (env_var_as_boolean("MESA_DISK_CACHE_SINGLE_FILE", false)) {
+   if (dc_job->cache->single_file) {
       disk_cache_write_item_to_disk_foz(dc_job);
    } else {
       filename = disk_cache_get_cache_filename(dc_job->cache, dc_job->key);
@@ -396,7 +405,7 @@ disk_cache_get(struct disk_cache *cache, const cache_key key, size_t *size)
       return blob;
    }
 
-   if (env_var_as_boolean("MESA_DISK_CACHE_SINGLE_FILE", false)) {
+   if (cache->single_file) {
       return disk_cache_load_item_foz(cache, key, size);
    } else {
       char *filename = disk_cache_get_cache_filename(cache, key);

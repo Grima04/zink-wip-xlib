@@ -692,10 +692,10 @@ disk_cache_write_item_to_disk(struct disk_cache_put_job *dc_job,
  */
 char *
 disk_cache_generate_cache_dir(void *mem_ctx, const char *gpu_name,
-                              const char *driver_id)
+                              const char *driver_id, bool single_file)
 {
    char *cache_dir_name = CACHE_DIR_NAME;
-   if (env_var_as_boolean("MESA_DISK_CACHE_SINGLE_FILE", false))
+   if (single_file)
       cache_dir_name = CACHE_DIR_NAME_SF;
 
    char *path = getenv("MESA_GLSL_CACHE_DIR");
@@ -756,7 +756,7 @@ disk_cache_generate_cache_dir(void *mem_ctx, const char *gpu_name,
          return NULL;
    }
 
-   if (env_var_as_boolean("MESA_DISK_CACHE_SINGLE_FILE", false)) {
+   if (single_file) {
       path = concatenate_and_mkdir(mem_ctx, path, driver_id);
       if (!path)
          return NULL;

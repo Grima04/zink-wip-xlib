@@ -75,6 +75,8 @@ struct disk_cache {
 
    disk_cache_put_cb blob_put_cb;
    disk_cache_get_cb blob_get_cb;
+
+   bool single_file;
 };
 
 struct disk_cache_put_job {
@@ -95,7 +97,7 @@ struct disk_cache_put_job {
 
 char *
 disk_cache_generate_cache_dir(void *mem_ctx, const char *gpu_name,
-                              const char *driver_id);
+                              const char *driver_id, bool single_file);
 
 void
 disk_cache_evict_lru_item(struct disk_cache *cache);
