@@ -1033,7 +1033,6 @@ zink_destroy_screen(struct pipe_screen *pscreen)
    simple_mtx_destroy(&screen->framebuffer_mtx);
 
    u_transfer_helper_destroy(pscreen->transfer_helper);
-   zink_screen_update_pipeline_cache(screen);
 #ifdef ENABLE_SHADER_CACHE
    if (screen->disk_cache) {
       util_queue_finish(&screen->cache_thread);
