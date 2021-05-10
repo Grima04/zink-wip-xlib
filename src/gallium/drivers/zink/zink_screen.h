@@ -94,11 +94,10 @@ struct zink_screen {
    simple_mtx_t bufferview_mtx;
 
    struct slab_parent_pool transfer_pool;
-   VkPipelineCache pipeline_cache;
-   size_t pipeline_cache_size;
    struct disk_cache *disk_cache;
    struct disk_cache_put_job dc_job;
-   struct util_queue cache_thread;
+   struct util_queue cache_put_thread;
+   struct util_queue cache_get_thread;
 
    struct util_live_shader_cache shaders;
 
@@ -340,7 +339,10 @@ zink_is_depth_format_supported(struct zink_screen *screen, VkFormat format);
 #define GET_PROC_ADDR_INSTANCE_LOCAL(instance, x) PFN_vk##x vk_##x = (PFN_vk##x)vkGetInstanceProcAddr(instance, "vk"#x)
 
 void
-zink_screen_update_pipeline_cache(struct zink_screen *screen);
+zink_screen_update_pipeline_cache(struct zink_screen *screen, struct zink_program *pg);
+
+void
+zink_screen_get_pipeline_cache(struct zink_screen *screen, struct zink_program *pg);
 
 void
 zink_screen_init_descriptor_funcs(struct zink_screen *screen, bool fallback);
