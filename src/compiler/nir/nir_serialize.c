@@ -25,6 +25,7 @@
 #include "nir_control_flow.h"
 #include "util/u_dynarray.h"
 #include "util/u_math.h"
+#include "util/mesa-sha1.h"
 
 #define NIR_SERIALIZE_FUNC_HAS_IMPL ((void *)(intptr_t)1)
 #define MAX_OBJECT_IDS (1 << 20)
@@ -2063,6 +2064,16 @@ nir_serialize(struct blob *blob, const nir_shader *nir, bool strip)
 
    _mesa_hash_table_destroy(ctx.remap_table, NULL);
    util_dynarray_fini(&ctx.phi_fixups);
+}
+
+void
+nir_serialize_sha1(const nir_shader *nir, unsigned char sha1[20])
+{
+   struct blob blob;
+   blob_init(&blob);
+   nir_serialize(&blob, nir, true);
+   _mesa_sha1_compute(blob.data, blob.size, sha1);
+   blob_finish(&blob);
 }
 
 nir_shader *

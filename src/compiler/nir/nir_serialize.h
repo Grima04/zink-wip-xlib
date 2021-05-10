@@ -36,6 +36,8 @@ nir_shader *nir_deserialize(void *mem_ctx,
                             const struct nir_shader_compiler_options *options,
                             struct blob_reader *blob);
 
+void nir_serialize_sha1(const nir_shader *nir, unsigned char sha1[20]);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
