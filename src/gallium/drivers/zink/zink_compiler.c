@@ -580,6 +580,17 @@ assign_io_locations(nir_shader *nir, unsigned char *shader_slot_map,
       *shader_slots_reserved = reserved;
 }
 
+static void
+zink_shader_dump(void *words, size_t size, const char *file)
+{
+   FILE *fp = fopen(file, "wb");
+   if (fp) {
+      fwrite(words, 1, size, fp);
+      fclose(fp);
+      fprintf(stderr, "wrote '%s'...\n", file);
+   }
+}
+
 VkShaderModule
 zink_shader_compile(struct zink_screen *screen, struct zink_shader *zs, struct zink_shader_key *key,
                     unsigned char *shader_slot_map, unsigned char *shader_slots_reserved)
@@ -650,12 +661,7 @@ zink_shader_compile(struct zink_screen *screen, struct zink_shader *zs, struct z
       char buf[256];
       static int i;
       snprintf(buf, sizeof(buf), "dump%02d.spv", i++);
-      FILE *fp = fopen(buf, "wb");
-      if (fp) {
-         fwrite(spirv->words, sizeof(uint32_t), spirv->num_words, fp);
-         fclose(fp);
-         fprintf(stderr, "wrote '%s'...\n", buf);
-      }
+      zink_shader_dump(spirv->words, spirv->num_words * sizeof(uint32_t), buf);
    }
 
    VkShaderModuleCreateInfo smci = {};
