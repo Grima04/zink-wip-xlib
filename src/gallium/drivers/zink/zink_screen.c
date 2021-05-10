@@ -145,7 +145,7 @@ disk_cache_init(struct zink_screen *screen)
    static char buf[1000];
    snprintf(buf, sizeof(buf), "zink_%x04x", screen->info.props.vendorID);
 
-   screen->disk_cache = disk_cache_create_single_file(buf, screen->info.props.deviceName, 0);
+   screen->disk_cache = disk_cache_create(buf, screen->info.props.deviceName, 0);
    if (screen->disk_cache) {
       util_queue_init(&screen->cache_put_thread, "zcq", 8, 1, UTIL_QUEUE_INIT_RESIZE_IF_FULL);
       util_queue_init(&screen->cache_get_thread, "zcfq", 8, 4, UTIL_QUEUE_INIT_RESIZE_IF_FULL);
