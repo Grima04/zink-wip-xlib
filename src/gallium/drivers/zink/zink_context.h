@@ -46,6 +46,10 @@
 
 #include <vulkan/vulkan.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct blitter_context;
 struct primconvert_context;
 struct list_head;
@@ -460,4 +464,9 @@ zink_pipeline_flags_from_pipe_stage(enum pipe_shader_type pstage)
       unreachable("unknown shader stage");
    }
 }
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
