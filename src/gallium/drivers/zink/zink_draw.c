@@ -454,9 +454,9 @@ zink_draw_vbo(struct pipe_context *pctx,
    ctx->gfx_prim_mode = dinfo->mode;
    update_gfx_program(ctx);
 
-   if (ctx->gfx_pipeline_state.primitive_restart != !!dinfo->primitive_restart)
+   if (ctx->gfx_pipeline_state.primitive_restart != dinfo->primitive_restart)
       ctx->gfx_pipeline_state.dirty = true;
-   ctx->gfx_pipeline_state.primitive_restart = !!dinfo->primitive_restart;
+   ctx->gfx_pipeline_state.primitive_restart = dinfo->primitive_restart;
 
    unsigned index_offset = 0;
    struct pipe_resource *index_buffer = NULL;
