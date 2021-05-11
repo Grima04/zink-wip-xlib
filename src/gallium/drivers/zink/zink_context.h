@@ -382,6 +382,8 @@ zink_resource_barrier(struct zink_context *ctx, struct zink_batch *batch, struct
  void
  zink_begin_render_pass(struct zink_context *ctx,
                         struct zink_batch *batch);
+void
+zink_end_render_pass(struct zink_context *ctx, struct zink_batch *batch);
 
 VkPipelineStageFlags
 zink_pipeline_flags_from_stage(VkShaderStageFlagBits stage);
