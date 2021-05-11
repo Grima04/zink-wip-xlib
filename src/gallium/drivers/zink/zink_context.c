@@ -1861,6 +1861,10 @@ flush_batch(struct zink_context *ctx, bool sync)
       ctx->scissor_changed = true;
       ctx->rast_state_changed = true;
       ctx->dsa_state_changed = true;
+      if (ctx->curr_program)
+         zink_select_draw_vbo(ctx);
+      if (ctx->curr_compute)
+         zink_select_launch_grid(ctx);
    }
 }
 
