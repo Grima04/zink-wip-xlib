@@ -423,18 +423,19 @@ zink_draw_vbo(struct pipe_context *pctx,
    bool need_index_buffer_unref = false;
    bool mode_changed = ctx->gfx_pipeline_state.mode != dinfo->mode;
    unsigned draw_count = ctx->batch.state->draw_count;
+   enum pipe_prim_type mode = dinfo->mode;
 
    update_barriers(ctx, false);
 
-   if (dinfo->primitive_restart && !restart_supported(dinfo->mode)) {
+   if (dinfo->primitive_restart && !restart_supported(mode)) {
        util_draw_vbo_without_prim_restart(pctx, dinfo, drawid_offset, dindirect, &draws[0]);
        return;
    }
-   if (dinfo->mode == PIPE_PRIM_QUADS ||
-       dinfo->mode == PIPE_PRIM_QUAD_STRIP ||
-       dinfo->mode == PIPE_PRIM_POLYGON ||
-       (!HAS_TRIFANS && dinfo->mode == PIPE_PRIM_TRIANGLE_FAN) ||
-       dinfo->mode == PIPE_PRIM_LINE_LOOP) {
+   if (mode == PIPE_PRIM_QUADS ||
+       mode == PIPE_PRIM_QUAD_STRIP ||
+       mode == PIPE_PRIM_POLYGON ||
+       (!HAS_TRIFANS && mode == PIPE_PRIM_TRIANGLE_FAN) ||
+       mode == PIPE_PRIM_LINE_LOOP) {
       util_primconvert_save_rasterizer_state(ctx->primconvert, &rast_state->base);
       util_primconvert_draw_vbo(ctx->primconvert, dinfo, drawid_offset, dindirect, draws, num_draws);
       return;
@@ -451,11 +452,11 @@ zink_draw_vbo(struct pipe_context *pctx,
       ctx->dirty_shader_stages |= BITFIELD_BIT(PIPE_SHADER_VERTEX);
    ctx->gfx_pipeline_state.vertices_per_patch = dinfo->vertices_per_patch;
    if (ctx->rast_state->base.point_quad_rasterization &&
-       ctx->gfx_prim_mode != dinfo->mode) {
-      if (ctx->gfx_prim_mode == PIPE_PRIM_POINTS || dinfo->mode == PIPE_PRIM_POINTS)
+       ctx->gfx_prim_mode != mode) {
+      if (ctx->gfx_prim_mode == PIPE_PRIM_POINTS || mode == PIPE_PRIM_POINTS)
          ctx->dirty_shader_stages |= BITFIELD_BIT(PIPE_SHADER_FRAGMENT);
    }
-   ctx->gfx_prim_mode = dinfo->mode;
+   ctx->gfx_prim_mode = mode;
    update_gfx_program(ctx);
 
    if (zink_program_has_descriptors(&ctx->curr_program->base)) {
@@ -525,7 +526,7 @@ zink_draw_vbo(struct pipe_context *pctx,
    VkPipeline prev_pipeline = ctx->gfx_pipeline_state.pipeline;
    VkPipeline pipeline = zink_get_gfx_pipeline(ctx, ctx->curr_program,
                                                &ctx->gfx_pipeline_state,
-                                               dinfo->mode);
+                                               mode);
    bool pipeline_changed = prev_pipeline != pipeline;
    if (BATCH_CHANGED || pipeline_changed)
       vkCmdBindPipeline(batch->state->cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -632,7 +633,7 @@ zink_draw_vbo(struct pipe_context *pctx,
       ctx->screen->vk_CmdSetFrontFaceEXT(batch->state->cmdbuf, ctx->gfx_pipeline_state.front_face);
 
    if (BATCH_CHANGED || ctx->rast_state_changed || mode_changed) {
-      enum pipe_prim_type reduced_prim = u_reduced_prim(dinfo->mode);
+      enum pipe_prim_type reduced_prim = u_reduced_prim(mode);
 
       bool depth_bias = false;
       switch (reduced_prim) {

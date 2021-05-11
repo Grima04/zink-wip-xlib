@@ -341,12 +341,6 @@ zink_fb_clear_enabled(const struct zink_context *ctx, unsigned idx)
    return ctx->clears_enabled & (PIPE_CLEAR_COLOR0 << idx);
 }
 
-struct zink_batch *
-zink_batch_rp(struct zink_context *ctx);
-
-struct zink_batch *
-zink_batch_no_rp(struct zink_context *ctx);
-
 void
 zink_fence_wait(struct pipe_context *ctx);
 
@@ -495,6 +489,26 @@ zink_pipeline_flags_from_pipe_stage(enum pipe_shader_type pstage)
    default:
       unreachable("unknown shader stage");
    }
+}
+
+
+static inline struct zink_batch *
+zink_batch_rp(struct zink_context *ctx)
+{
+   struct zink_batch *batch = &ctx->batch;
+   if (!batch->in_rp) {
+      zink_begin_render_pass(ctx, batch);
+   }
+   return batch;
+}
+
+static inline struct zink_batch *
+zink_batch_no_rp(struct zink_context *ctx)
+{
+   struct zink_batch *batch = &ctx->batch;
+   zink_end_render_pass(ctx, batch);
+   assert(!batch->in_rp);
+   return batch;
 }
 
 void
