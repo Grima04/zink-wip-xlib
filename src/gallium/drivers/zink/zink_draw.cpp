@@ -402,7 +402,7 @@ update_barriers(struct zink_context *ctx, bool is_compute)
 }
 
 template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED,
-          zink_trifan HAS_TRIFANS>
+          zink_trifan HAS_TRIFANS, bool STREAMOUT>
 void
 zink_draw_vbo(struct pipe_context *pctx,
               const struct pipe_draw_info *dinfo,
@@ -504,8 +504,7 @@ zink_draw_vbo(struct pipe_context *pctx,
       vkCmdBindIndexBuffer(batch->state->cmdbuf, res->obj->buffer, index_offset, index_type[index_size >> 1]);
    }
 
-   bool have_streamout = !!ctx->num_so_targets;
-   if (have_streamout) {
+   if (STREAMOUT) {
       if (ctx->xfb_barrier)
          zink_emit_xfb_counter_barrier(ctx);
       if (ctx->dirty_so_targets)
@@ -691,7 +690,7 @@ zink_draw_vbo(struct pipe_context *pctx,
 
    zink_query_update_gs_states(ctx);
 
-   if (have_streamout) {
+   if (STREAMOUT) {
       for (unsigned i = 0; i < ctx->num_so_targets; i++) {
          struct zink_so_target *t = zink_so_target(ctx->so_targets[i]);
          counter_buffers[i] = VK_NULL_HANDLE;
@@ -765,7 +764,7 @@ zink_draw_vbo(struct pipe_context *pctx,
       }
    }
 
-   if (have_streamout) {
+   if (STREAMOUT) {
       for (unsigned i = 0; i < ctx->num_so_targets; i++) {
          struct zink_so_target *t = zink_so_target(ctx->so_targets[i]);
          if (t) {
@@ -832,11 +831,20 @@ zink_launch_grid(struct pipe_context *pctx, const struct pipe_grid_info *info)
    zink_maybe_flush_or_stall(ctx);
 }
 
+template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS,
+          bool STREAMOUT>
+static void
+init_streamout_functions(struct zink_context *ctx)
+{
+   ctx->draw_vbo[HAS_MULTIDRAW][HAS_DYNAMIC_STATE][BATCH_CHANGED][HAS_TRIFANS][STREAMOUT] = zink_draw_vbo<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT>;
+}
+
 template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS>
 static void
 init_trifan_functions(struct zink_context *ctx)
 {
-   ctx->draw_vbo[HAS_MULTIDRAW][HAS_DYNAMIC_STATE][BATCH_CHANGED][HAS_TRIFANS] = zink_draw_vbo<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS>;
+   init_streamout_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, false>(ctx);
+   init_streamout_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, true>(ctx);
 }
 
 template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED>
