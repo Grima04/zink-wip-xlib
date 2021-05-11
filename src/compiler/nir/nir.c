@@ -233,6 +233,14 @@ nir_local_variable_create(nir_function_impl *impl,
    return var;
 }
 
+void
+nir_variable_remove(nir_shader *shader, nir_variable *var)
+{
+   var->data.mode = nir_var_shader_temp;
+   nir_fixup_deref_modes(shader);
+   nir_remove_dead_variables(shader, nir_var_shader_temp, NULL);
+}
+
 nir_variable *
 nir_find_variable_with_location(nir_shader *shader,
                                 nir_variable_mode mode,

@@ -3581,6 +3581,9 @@ nir_variable *nir_local_variable_create(nir_function_impl *impl,
                                         const struct glsl_type *type,
                                         const char *name);
 
+/** sets mode to shader_temp and runs fixup_deref_modes and remove_dead_variables */
+void nir_variable_remove(nir_shader *shader, nir_variable *var);
+
 nir_variable *nir_find_variable_with_location(nir_shader *shader,
                                               nir_variable_mode mode,
                                               unsigned location);
