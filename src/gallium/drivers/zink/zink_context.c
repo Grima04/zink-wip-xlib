@@ -55,6 +55,8 @@
 #include "util/u_memory.h"
 #include "util/u_upload_mgr.h"
 
+#include "zink_inlines.h"
+
 #define XXH_INLINE_ALL
 #include "util/xxhash.h"
 

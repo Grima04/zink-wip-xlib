@@ -401,7 +401,8 @@ update_barriers(struct zink_context *ctx, bool is_compute)
    }
 }
 
-template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED>
+template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED,
+          zink_trifan HAS_TRIFANS>
 void
 zink_draw_vbo(struct pipe_context *pctx,
               const struct pipe_draw_info *dinfo,
@@ -431,7 +432,7 @@ zink_draw_vbo(struct pipe_context *pctx,
    if (dinfo->mode == PIPE_PRIM_QUADS ||
        dinfo->mode == PIPE_PRIM_QUAD_STRIP ||
        dinfo->mode == PIPE_PRIM_POLYGON ||
-       (dinfo->mode == PIPE_PRIM_TRIANGLE_FAN && !ctx->screen->have_triangle_fans) ||
+       (!HAS_TRIFANS && dinfo->mode == PIPE_PRIM_TRIANGLE_FAN) ||
        dinfo->mode == PIPE_PRIM_LINE_LOOP) {
       util_primconvert_save_rasterizer_state(ctx->primconvert, &rast_state->base);
       util_primconvert_draw_vbo(ctx->primconvert, dinfo, drawid_offset, dindirect, draws, num_draws);
@@ -831,11 +832,19 @@ zink_launch_grid(struct pipe_context *pctx, const struct pipe_grid_info *info)
    zink_maybe_flush_or_stall(ctx);
 }
 
+template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS>
+static void
+init_trifan_functions(struct zink_context *ctx)
+{
+   ctx->draw_vbo[HAS_MULTIDRAW][HAS_DYNAMIC_STATE][BATCH_CHANGED][HAS_TRIFANS] = zink_draw_vbo<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS>;
+}
+
 template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED>
 static void
 init_batch_changed_functions(struct zink_context *ctx)
 {
-   ctx->draw_vbo[HAS_MULTIDRAW][HAS_DYNAMIC_STATE][BATCH_CHANGED] = zink_draw_vbo<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED>;
+   init_trifan_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, ZINK_NO_TRIFAN>(ctx);
+   init_trifan_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, ZINK_TRIFAN>(ctx);
 }
 
 template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE>

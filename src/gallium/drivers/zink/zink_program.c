@@ -39,6 +39,8 @@
 #include "util/u_memory.h"
 #include "tgsi/tgsi_from_mesa.h"
 
+#include "zink_inlines.h"
+
 /* for pipeline cache */
 #define XXH_INLINE_ALL
 #include "util/xxhash.h"
