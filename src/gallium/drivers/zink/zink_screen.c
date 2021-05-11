@@ -186,7 +186,9 @@ cache_put_job(void *data, int thread_index)
    if (vkGetPipelineCacheData(job->screen->dev, job->pg->pipeline_cache, &size, pipeline_data) == VK_SUCCESS) {
       job->pg->pipeline_cache_size = size;
 
-      disk_cache_put_nocopy(job->screen->disk_cache, job->pg->sha1, pipeline_data, size, NULL);
+      cache_key key;
+      disk_cache_compute_key(job->screen->disk_cache, job->pg->sha1, sizeof(job->pg->sha1), key);
+      disk_cache_put_nocopy(job->screen->disk_cache, key, pipeline_data, size, NULL);
    }
 end:
    free(job);
