@@ -1016,7 +1016,10 @@ static void
 zink_bind_vs_state(struct pipe_context *pctx,
                    void *cso)
 {
-   bind_stage(zink_context(pctx), PIPE_SHADER_VERTEX, cso);
+   struct zink_context *ctx = zink_context(pctx);
+   bind_stage(ctx, PIPE_SHADER_VERTEX, cso);
+   if (cso)
+      zink_select_draw_vbo(ctx);
 }
 
 static void
