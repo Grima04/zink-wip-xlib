@@ -556,6 +556,13 @@ zink_create_gfx_program(struct zink_context *ctx,
          goto fail;
    }
 
+   if (stages[PIPE_SHADER_GEOMETRY])
+      prog->last_vertex_stage = stages[PIPE_SHADER_GEOMETRY];
+   else if (stages[PIPE_SHADER_TESS_EVAL])
+      prog->last_vertex_stage = stages[PIPE_SHADER_TESS_EVAL];
+   else
+      prog->last_vertex_stage = stages[PIPE_SHADER_VERTEX];
+
    struct mesa_sha1 sctx;
    _mesa_sha1_init(&sctx);
    for (int i = 0; i < ZINK_SHADER_COUNT; ++i) {
