@@ -235,7 +235,7 @@ line_width_needed(enum pipe_prim_type reduced_prim,
    }
 }
 
-static inline bool
+ALWAYS_INLINE static bool
 restart_supported(enum pipe_prim_type mode)
 {
     return mode == PIPE_PRIM_LINE_STRIP || mode == PIPE_PRIM_TRIANGLE_STRIP || mode == PIPE_PRIM_TRIANGLE_FAN;
