@@ -422,6 +422,7 @@ zink_draw_vbo(struct pipe_context *pctx,
    VkDeviceSize counter_buffer_offsets[PIPE_MAX_SO_OUTPUTS];
    bool need_index_buffer_unref = false;
    bool mode_changed = ctx->gfx_pipeline_state.mode != dinfo->mode;
+   unsigned draw_count = ctx->batch.state->draw_count;
 
    update_barriers(ctx, false);
 
@@ -713,7 +714,7 @@ zink_draw_vbo(struct pipe_context *pctx,
    }
 
    bool needs_drawid = DRAWID && ctx->drawid_broken;
-   batch->state->draw_count += num_draws;
+   draw_count += num_draws;
    if (index_size > 0) {
       if (dindirect && dindirect->buffer) {
          assert(num_draws == 1);
@@ -775,9 +776,10 @@ zink_draw_vbo(struct pipe_context *pctx,
       ctx->screen->vk_CmdEndTransformFeedbackEXT(batch->state->cmdbuf, 0, ctx->num_so_targets, counter_buffers, counter_buffer_offsets);
    }
    batch->has_work = true;
+   ctx->batch.state->draw_count = draw_count;
    /* flush if there's >100k draws */
    if (unlikely(ctx->batch.state->resource_size >= ctx->screen->total_video_mem / 2 ||
-                ctx->batch.state->draw_count >= 100000))
+                draw_count >= 100000))
       pctx->flush(pctx, NULL, PIPE_FLUSH_ASYNC);
 }
 
