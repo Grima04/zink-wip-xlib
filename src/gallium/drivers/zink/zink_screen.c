@@ -217,7 +217,10 @@ cache_get_job(void *data, int thread_index)
    pcci.flags = job->screen->info.have_EXT_pipeline_creation_cache_control ? VK_PIPELINE_CACHE_CREATE_EXTERNALLY_SYNCHRONIZED_BIT_EXT : 0;
    pcci.initialDataSize = 0;
    pcci.pInitialData = NULL;
-   pcci.pInitialData = disk_cache_get(job->screen->disk_cache, job->pg->sha1, &job->pg->pipeline_cache_size);
+
+   cache_key key;
+   disk_cache_compute_key(job->screen->disk_cache, job->pg->sha1, sizeof(job->pg->sha1), key);
+   pcci.pInitialData = disk_cache_get(job->screen->disk_cache, key, &job->pg->pipeline_cache_size);
    pcci.initialDataSize = job->pg->pipeline_cache_size;
    vkCreatePipelineCache(job->screen->dev, &pcci, NULL, &job->pg->pipeline_cache);
    free((void*)pcci.pInitialData);
