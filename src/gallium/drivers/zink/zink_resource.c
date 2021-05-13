@@ -76,19 +76,6 @@ debug_describe_zink_resource_object(char *buf, const struct zink_resource_object
 }
 
 static uint32_t
-get_resource_usage(struct zink_resource *res)
-{
-   bool reads = zink_batch_usage_exists(res->obj->reads);
-   bool writes = zink_batch_usage_exists(res->obj->writes);
-   uint32_t batch_uses = 0;
-   if (reads)
-      batch_uses |= ZINK_RESOURCE_ACCESS_READ;
-   if (writes)
-      batch_uses |= ZINK_RESOURCE_ACCESS_WRITE;
-   return batch_uses;
-}
-
-static uint32_t
 mem_hash(const void *key)
 {
    const struct mem_key *mkey = key;
@@ -106,9 +93,9 @@ mem_equals(const void *a, const void *b)
 static void
 cache_or_free_mem(struct zink_screen *screen, struct zink_resource_object *obj)
 {
-   if (obj->mkey.key.heap_index != UINT32_MAX) {
-      simple_mtx_lock(&screen->mem[obj->mkey.key.heap_index].mem_cache_mtx);
-      struct hash_entry *he = _mesa_hash_table_search_pre_hashed(&screen->mem[obj->mkey.key.heap_index].resource_mem_cache, obj->mem_hash, &obj->mkey);
+   if (obj->cache.mkey.key.heap_index != UINT32_MAX) {
+      simple_mtx_lock(&screen->mem.mem[obj->cache.mkey.key.heap_index].mem_cache_mtx);
+      struct hash_entry *he = _mesa_hash_table_search_pre_hashed(&screen->mem.mem[obj->cache.mkey.key.heap_index].resource_mem_cache, obj->cache.mem_hash, &obj->cache.mkey);
       assert(he);
       struct util_dynarray *array = he->data;
       struct mem_key *mkey = (void*)he->key;
@@ -117,16 +104,16 @@ cache_or_free_mem(struct zink_screen *screen, struct zink_resource_object *obj)
       mkey->seen_count--;
       if (util_dynarray_num_elements(array, struct mem_cache_entry) < seen) {
          struct mem_cache_entry mc = { obj->mem, obj->map };
-         screen->mem[obj->mkey.key.heap_index].mem_cache_size += obj->size;
+         screen->mem.mem[obj->cache.mkey.key.heap_index].mem_cache_size += obj->size;
          if (sizeof(void*) == 4 && obj->map) {
             vkUnmapMemory(screen->dev, obj->mem);
             mc.map = NULL;
          }
          util_dynarray_append(array, struct mem_cache_entry, mc);
-         simple_mtx_unlock(&screen->mem[obj->mkey.key.heap_index].mem_cache_mtx);
+         simple_mtx_unlock(&screen->mem.mem[obj->cache.mkey.key.heap_index].mem_cache_mtx);
          return;
       }
-      simple_mtx_unlock(&screen->mem[obj->mkey.key.heap_index].mem_cache_mtx);
+      simple_mtx_unlock(&screen->mem.mem[obj->cache.mkey.key.heap_index].mem_cache_mtx);
    }
    vkFreeMemory(screen->dev, obj->mem, NULL);
 }
@@ -134,6 +121,8 @@ cache_or_free_mem(struct zink_screen *screen, struct zink_resource_object *obj)
 void
 zink_destroy_resource_object(struct zink_screen *screen, struct zink_resource_object *obj)
 {
+   //assert((obj->dedicated && !obj->reads && !obj->writes) ||
+          //(!obj->dedicated && !obj->bo->reads && !obj->bo->writes));
    if (obj->is_buffer) {
       util_dynarray_foreach(&obj->tmp, VkBuffer, buffer)
          vkDestroyBuffer(screen->dev, *buffer, NULL);
@@ -144,7 +133,10 @@ zink_destroy_resource_object(struct zink_screen *screen, struct zink_resource_ob
 
    util_dynarray_fini(&obj->tmp);
    zink_descriptor_set_refs_clear(&obj->desc_set_refs, obj);
-   cache_or_free_mem(screen, obj);
+   if (obj->dedicated)
+      cache_or_free_mem(screen, obj);
+   else
+      zink_bo_unref(screen, obj->bo);
    FREE(obj);
 }
 
@@ -638,9 +630,6 @@ resource_object_create(struct zink_screen *screen, const struct pipe_resource *t
    VkMemoryType mem_type = screen->info.mem_props.memoryTypes[mai.memoryTypeIndex];
    obj->coherent = mem_type.propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
    obj->host_visible = mem_type.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-   if (templ->target == PIPE_BUFFER && !obj->coherent && obj->host_visible) {
-      mai.allocationSize = reqs.size = align(reqs.size, screen->info.props.limits.nonCoherentAtomSize);
-   }
 
    struct VkMemoryDedicatedAllocateInfo ded_alloc_info = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO,
@@ -689,45 +678,59 @@ resource_object_create(struct zink_screen *screen, const struct pipe_resource *t
       mai.pNext = &memory_wsi_info;
    }
 
+   /* TODO: make this just !mai.pNext */
    if (!mai.pNext && !(templ->flags & (PIPE_RESOURCE_FLAG_MAP_COHERENT | PIPE_RESOURCE_FLAG_SPARSE))) {
-      obj->mkey.key.reqs = reqs;
-      obj->mkey.key.heap_index = mai.memoryTypeIndex;
-      obj->mem_hash = mem_hash(&obj->mkey);
-      simple_mtx_lock(&screen->mem[mai.memoryTypeIndex].mem_cache_mtx);
-
-      struct hash_entry *he = _mesa_hash_table_search_pre_hashed(&screen->mem[mai.memoryTypeIndex].resource_mem_cache, obj->mem_hash, &obj->mkey);
-      struct mem_key *mkey;
-      if (he) {
-         struct util_dynarray *array = he->data;
-         mkey = (void*)he->key;
-         if (array && util_dynarray_num_elements(array, struct mem_cache_entry)) {
-            struct mem_cache_entry mc = util_dynarray_pop(array, struct mem_cache_entry);
-            obj->mem = mc.mem;
-            obj->map = mc.map;
-            screen->mem[mai.memoryTypeIndex].mem_cache_size -= reqs.size;
-            screen->mem[mai.memoryTypeIndex].mem_cache_count--;
-         }
+      if (1) {
+         enum zink_alloc_flag aflags = templ->flags & PIPE_RESOURCE_FLAG_SPARSE ? ZINK_ALLOC_SPARSE : 0;
+         unsigned alignment = MAX2(reqs.alignment, 256);
+         obj->bo = zink_bo(zink_bo_create(screen, reqs.size, alignment, mem_type.propertyFlags, aflags));
+         obj->offset = zink_bo_get_offset(obj->bo);
+         obj->mem = zink_bo_get_mem(obj->bo);
+         obj->size = zink_bo_get_size(obj->bo);
       } else {
-         mkey = ralloc(screen, struct mem_key);
-         memcpy(&mkey->key, &obj->mkey.key, sizeof(obj->mkey.key));
-         mkey->seen_count = 0;
-         struct util_dynarray *array = rzalloc(screen, struct util_dynarray);
-         util_dynarray_init(array, screen);
-         _mesa_hash_table_insert_pre_hashed(&screen->mem[mai.memoryTypeIndex].resource_mem_cache, obj->mem_hash, mkey, array);
+         obj->cache.mkey.key.reqs = reqs;
+         obj->cache.mkey.key.heap_index = mai.memoryTypeIndex;
+         obj->cache.mem_hash = mem_hash(&obj->cache.mkey);
+         obj->offset = 0;
+         obj->size = reqs.size;
+         obj->dedicated = true;
+         simple_mtx_lock(&screen->mem.mem[mai.memoryTypeIndex].mem_cache_mtx);
+
+         struct hash_entry *he = _mesa_hash_table_search_pre_hashed(&screen->mem.mem[mai.memoryTypeIndex].resource_mem_cache, obj->cache.mem_hash, &obj->cache.mkey);
+         struct mem_key *mkey;
+         if (he) {
+            struct util_dynarray *array = he->data;
+            mkey = (void*)he->key;
+            if (array && util_dynarray_num_elements(array, struct mem_cache_entry)) {
+               struct mem_cache_entry mc = util_dynarray_pop(array, struct mem_cache_entry);
+               obj->mem = mc.mem;
+               obj->map = mc.map;
+               screen->mem.mem[mai.memoryTypeIndex].mem_cache_size -= reqs.size;
+               screen->mem.mem[mai.memoryTypeIndex].mem_cache_count--;
+            }
+         } else {
+            mkey = ralloc(screen, struct mem_key);
+            memcpy(&mkey->key, &obj->cache.mkey.key, sizeof(obj->cache.mkey.key));
+            mkey->seen_count = 0;
+            struct util_dynarray *array = rzalloc(screen, struct util_dynarray);
+            util_dynarray_init(array, screen);
+            _mesa_hash_table_insert_pre_hashed(&screen->mem.mem[mai.memoryTypeIndex].resource_mem_cache, obj->cache.mem_hash, mkey, array);
+         }
+         mkey->seen_count++;
+         simple_mtx_unlock(&screen->mem.mem[mai.memoryTypeIndex].mem_cache_mtx);
       }
-      mkey->seen_count++;
-      simple_mtx_unlock(&screen->mem[mai.memoryTypeIndex].mem_cache_mtx);
-   } else
-      obj->mkey.key.heap_index = UINT32_MAX;
+   } else {
+      obj->dedicated = true;
+      obj->cache.mkey.key.heap_index = UINT32_MAX;
+      obj->offset = 0;
+      obj->size = reqs.size;
+   }
 
    /* TODO: sparse buffers should probably allocate multiple regions of memory instead of giant blobs? */
-   if (!obj->mem && vkAllocateMemory(screen->dev, &mai, NULL, &obj->mem) != VK_SUCCESS) {
+   if (obj->dedicated && vkAllocateMemory(screen->dev, &mai, NULL, &obj->mem) != VK_SUCCESS) {
       debug_printf("vkAllocateMemory failed\n");
       goto fail2;
    }
-
-   obj->offset = 0;
-   obj->size = reqs.size;
 
    if (templ->target == PIPE_BUFFER) {
       if (!(templ->flags & PIPE_RESOURCE_FLAG_SPARSE))
@@ -1025,18 +1028,18 @@ invalidate_buffer(struct zink_context *ctx, struct zink_resource *res)
    res->bind_history &= ~ZINK_RESOURCE_USAGE_STREAMOUT;
 
    util_range_set_empty(&res->valid_buffer_range);
-   if (!get_resource_usage(res))
+   if (!zink_resource_has_usage(res))
       return false;
 
    struct zink_resource_object *old_obj = res->obj;
+   bool has_usage = zink_resource_has_usage(res);
    struct zink_resource_object *new_obj = resource_object_create(screen, &res->base.b, NULL, NULL, NULL, 0);
    if (!new_obj) {
       debug_printf("new backing resource alloc failed!");
       return false;
    }
    bool needs_unref = true;
-   if (zink_batch_usage_exists(old_obj->reads) ||
-       zink_batch_usage_exists(old_obj->writes)) {
+   if (has_usage) {
       zink_batch_reference_resource_move(&ctx->batch, res);
       needs_unref = false;
    }
@@ -1096,13 +1099,6 @@ zink_transfer_copy_bufimage(struct zink_context *ctx,
                                 0, &box);
 }
 
-bool
-zink_resource_has_usage(struct zink_resource *res, enum zink_resource_access usage)
-{
-   uint32_t batch_uses = get_resource_usage(res);
-   return batch_uses & usage;
-}
-
 ALWAYS_INLINE static void
 align_offset_size(const VkDeviceSize alignment, VkDeviceSize *offset, VkDeviceSize *size, VkDeviceSize obj_size)
 {
@@ -1141,6 +1137,8 @@ map_resource(struct zink_screen *screen, struct zink_resource *res)
    if (res->obj->map)
       return res->obj->map;
    assert(res->obj->host_visible);
+   if (!res->obj->dedicated)
+      return zink_bo_map(screen, res->obj->bo);
    result = vkMapMemory(screen->dev, res->obj->mem, res->obj->offset,
                         res->obj->size, 0, &res->obj->map);
    return result == VK_SUCCESS ? res->obj->map : NULL;
@@ -1150,7 +1148,10 @@ static void
 unmap_resource(struct zink_screen *screen, struct zink_resource *res)
 {
    res->obj->map = NULL;
-   vkUnmapMemory(screen->dev, res->obj->mem);
+   if (!res->obj->dedicated)
+      zink_bo_unmap(screen, res->obj->bo);
+   else
+      vkUnmapMemory(screen->dev, res->obj->mem);
 }
 
 static void *
@@ -1191,16 +1192,13 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
 
    if ((usage & PIPE_MAP_WRITE) &&
        (usage & PIPE_MAP_DISCARD_RANGE ||
-        (!(usage & PIPE_MAP_READ) && zink_resource_has_usage(res, ZINK_RESOURCE_ACCESS_RW)) ||
+        (!(usage & PIPE_MAP_READ) && zink_resource_has_usage(res)) ||
         !res->obj->host_visible ||
         !(usage & (PIPE_MAP_UNSYNCHRONIZED | PIPE_MAP_PERSISTENT)))) {
-
       /* Check if mapping this buffer would cause waiting for the GPU.
        */
 
-      if (!res->obj->host_visible ||
-          !zink_batch_usage_check_completion(ctx, res->obj->reads) ||
-          !zink_batch_usage_check_completion(ctx, res->obj->writes)) {
+      if (!res->obj->host_visible || !zink_resource_usage_check_completion(screen, res, ZINK_RESOURCE_ACCESS_RW)) {
          /* Do a wait-free write-only transfer using a temporary buffer. */
          unsigned offset;
 
@@ -1229,7 +1227,7 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
          /* sparse/device-local will always need to wait since it has to copy */
          if (!res->obj->host_visible)
             return NULL;
-         if (!zink_batch_usage_check_completion(ctx, res->obj->writes))
+         if (!zink_resource_usage_check_completion(screen, res, ZINK_RESOURCE_ACCESS_WRITE))
             return NULL;
       } else if (!res->obj->host_visible) {
          trans->staging_res = pipe_buffer_create(&screen->base, PIPE_BIND_LINEAR, PIPE_USAGE_STAGING, box->x + box->width);
@@ -1241,7 +1239,7 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
          res = staging_res;
          zink_fence_wait(&ctx->base);
       } else
-         zink_batch_usage_wait(ctx, res->obj->writes);
+         zink_resource_usage_wait(ctx, res, ZINK_RESOURCE_ACCESS_WRITE);
    }
 
    if (!ptr) {
@@ -1365,11 +1363,11 @@ zink_transfer_map(struct pipe_context *pctx,
          base = map_resource(screen, res);
          if (!base)
             return NULL;
-         if (zink_resource_has_usage(res, ZINK_RESOURCE_ACCESS_RW)) {
+         if (zink_resource_has_usage(res)) {
             if (usage & PIPE_MAP_WRITE)
                zink_fence_wait(pctx);
             else
-               zink_batch_usage_wait(ctx, res->obj->writes);
+               zink_resource_usage_wait(ctx, res, ZINK_RESOURCE_ACCESS_WRITE);
          }
          VkImageSubresource isr = {
             res->obj->modifier_aspect ? res->obj->modifier_aspect : res->aspect,
@@ -1571,7 +1569,7 @@ zink_resource_object_init_storage(struct zink_context *ctx, struct zink_resource
       struct zink_resource staging = *res;
       staging.obj = old_obj;
       bool needs_unref = true;
-      if (get_resource_usage(res)) {
+      if (zink_resource_has_usage(res)) {
          zink_batch_reference_resource_move(&ctx->batch, res);
          needs_unref = false;
       }
@@ -1690,14 +1688,16 @@ zink_screen_resource_init(struct pipe_screen *pscreen)
       pscreen->resource_from_handle = zink_resource_from_handle;
    }
    pscreen->resource_get_param = zink_resource_get_param;
-
-   screen->mem = rzalloc_array(screen, struct zink_mem_cache, screen->info.mem_props.memoryTypeCount);
-   if (!screen->mem)
+   
+#if 0
+   screen->mem.mem = rzalloc_array(screen, struct zink_mem_cache, screen->info.mem_props.memoryTypeCount);
+   if (!screen->mem.mem)
       return false;
    for (uint32_t i = 0; i < screen->info.mem_props.memoryTypeCount; ++i) {
-      simple_mtx_init(&screen->mem[i].mem_cache_mtx, mtx_plain);
-      _mesa_hash_table_init(&screen->mem[i].resource_mem_cache, screen, mem_hash, mem_equals);
+      simple_mtx_init(&screen->mem.mem[i].mem_cache_mtx, mtx_plain);
+      _mesa_hash_table_init(&screen->mem.mem[i].resource_mem_cache, screen, mem_hash, mem_equals);
    }
+#endif
    return true;
 }
 

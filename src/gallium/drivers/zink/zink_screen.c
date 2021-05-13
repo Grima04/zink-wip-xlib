@@ -601,8 +601,8 @@ zink_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
       return screen->info.feats.features.shaderCullDistance;
 
    case PIPE_CAP_SPARSE_BUFFER_PAGE_SIZE:
-      /* this is the spec minimum */
-      return screen->info.feats.features.sparseBinding ? 64 * 1024 : 0;
+      
+      return screen->info.feats.features.sparseBinding ? ZINK_SPARSE_BUFFER_PAGE_SIZE : 0;
 
    case PIPE_CAP_VIEWPORT_SUBPIXEL_BITS:
       return screen->info.props.limits.viewportSubPixelBits;
@@ -1106,15 +1106,16 @@ zink_destroy_screen(struct pipe_screen *pscreen)
    }
 #endif
    disk_cache_destroy(screen->disk_cache);
-
+#if 0
    for (uint32_t i = 0; i < screen->info.mem_props.memoryHeapCount; ++i) {
-      simple_mtx_lock(&screen->mem[i].mem_cache_mtx);
-      hash_table_foreach(&screen->mem[i].resource_mem_cache, he)
+      simple_mtx_lock(&screen->mem.mem[i].mem_cache_mtx);
+      hash_table_foreach(&screen->mem.mem[i].resource_mem_cache, he)
          resource_cache_entry_destroy(screen, he);
-      simple_mtx_unlock(&screen->mem[i].mem_cache_mtx);
-      simple_mtx_destroy(&screen->mem[i].mem_cache_mtx);
+      simple_mtx_unlock(&screen->mem.mem[i].mem_cache_mtx);
+      simple_mtx_destroy(&screen->mem.mem[i].mem_cache_mtx);
    }
-
+#endif
+   zink_bo_deinit(screen);
    util_live_shader_cache_deinit(&screen->shaders);
 
    if (screen->sem)
@@ -2069,6 +2070,7 @@ zink_internal_create_screen(const struct pipe_screen_config *config)
 
    if (!zink_screen_resource_init(&screen->base))
       goto fail;
+   zink_bo_init(screen);
    zink_screen_fence_init(&screen->base);
 
    zink_screen_init_compiler(screen);
@@ -2091,6 +2093,19 @@ zink_internal_create_screen(const struct pipe_screen_config *config)
       goto fail;
    if (screen->info.have_KHR_timeline_semaphore)
       zink_screen_init_semaphore(screen);
+
+   memset(&screen->heap_map, -1, sizeof(screen->heap_map));
+   for (enum zink_heap i = 0; i < ZINK_HEAP_MAX; i++) {
+      for (unsigned j = 0; j < screen->info.mem_props.memoryTypeCount; j++) {
+         VkMemoryPropertyFlags domains = vk_domain_from_heap(i);
+         if ((screen->info.mem_props.memoryTypes[j].propertyFlags & domains) == domains) {
+            assert(screen->heap_map[i] == UINT8_MAX);
+            screen->heap_map[i] = j;
+            break;
+         }
+      }
+      assert(screen->heap_map[i] != UINT8_MAX);
+   }
 
    simple_mtx_init(&screen->surface_mtx, mtx_plain);
    simple_mtx_init(&screen->bufferview_mtx, mtx_plain);

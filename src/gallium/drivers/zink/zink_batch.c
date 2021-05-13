@@ -38,8 +38,7 @@ zink_reset_batch_state(struct zink_context *ctx, struct zink_batch_state *bs)
    /* unref all used resources */
    set_foreach_remove(bs->resources, entry) {
       struct zink_resource_object *obj = (struct zink_resource_object *)entry->key;
-      zink_batch_usage_unset(&obj->reads, bs);
-      zink_batch_usage_unset(&obj->writes, bs);
+      zink_resource_object_usage_unset(obj, bs);
       zink_resource_object_reference(screen, &obj, NULL);
    }
 
@@ -577,12 +576,9 @@ zink_end_batch(struct zink_context *ctx, struct zink_batch *batch)
 void
 zink_batch_resource_usage_set(struct zink_batch *batch, struct zink_resource *res, bool write)
 {
-   if (write) {
-      zink_batch_usage_set(&res->obj->writes, batch->state);
+   zink_resource_usage_set(res, batch->state, write);
+   if (write)
       res->scanout_dirty = !!res->scanout_obj;
-   } else {
-      zink_batch_usage_set(&res->obj->reads, batch->state);
-   }
    /* multiple array entries are fine */
    if (res->obj->persistent_maps && !res->obj->coherent)
       util_dynarray_append(&batch->state->persistent_resources, struct zink_resource_object*, res->obj);
