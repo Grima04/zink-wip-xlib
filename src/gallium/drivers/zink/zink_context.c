@@ -924,7 +924,7 @@ zink_set_vertex_buffers(struct pipe_context *pctx,
 
    if (buffers) {
       if (!ctx->screen->info.have_EXT_extended_dynamic_state)
-         ctx->gfx_pipeline_state.vertex_state_dirty = true;
+         ctx->vertex_state_changed = true;
       for (unsigned i = 0; i < num_buffers; ++i) {
          const struct pipe_vertex_buffer *vb = buffers + i;
          struct pipe_vertex_buffer *ctx_vb = &ctx->vertex_buffers[start_slot + i];
@@ -950,7 +950,7 @@ zink_set_vertex_buffers(struct pipe_context *pctx,
       }
    } else {
       if (!ctx->screen->info.have_EXT_extended_dynamic_state)
-         ctx->gfx_pipeline_state.vertex_state_dirty = true;
+         ctx->vertex_state_changed = true;
       for (unsigned i = 0; i < num_buffers; ++i) {
          update_existing_vbo(ctx, start_slot + i);
          pipe_resource_reference(&ctx->vertex_buffers[start_slot + i].buffer.resource, NULL);
@@ -1892,6 +1892,8 @@ flush_batch(struct zink_context *ctx, bool sync)
          zink_select_draw_vbo(ctx);
       if (ctx->curr_compute)
          zink_select_launch_grid(ctx);
+      if (ctx->screen->info.have_EXT_vertex_input_dynamic_state)
+         ctx->vertex_state_changed = true;
 
       if (ctx->oom_stall)
          zink_fence_wait(&ctx->base);

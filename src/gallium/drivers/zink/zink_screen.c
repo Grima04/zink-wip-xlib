@@ -1501,6 +1501,10 @@ load_device_extensions(struct zink_screen *screen)
       GET_PROC_ADDR_INSTANCE(GetPhysicalDeviceMultisamplePropertiesEXT);
    }
 
+   if (screen->info.have_EXT_vertex_input_dynamic_state) {
+      GET_PROC_ADDR(CmdSetVertexInputEXT);
+   }
+
    return true;
 }
 
