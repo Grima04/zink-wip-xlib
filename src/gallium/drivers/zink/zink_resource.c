@@ -135,13 +135,14 @@ void
 zink_destroy_resource_object(struct zink_screen *screen, struct zink_resource_object *obj)
 {
    if (obj->is_buffer) {
-      if (obj->sbuffer)
-         vkDestroyBuffer(screen->dev, obj->sbuffer, NULL);
+      util_dynarray_foreach(&obj->tmp, VkBuffer, buffer)
+         vkDestroyBuffer(screen->dev, *buffer, NULL);
       vkDestroyBuffer(screen->dev, obj->buffer, NULL);
    } else {
       vkDestroyImage(screen->dev, obj->image, NULL);
    }
 
+   util_dynarray_fini(&obj->tmp);
    zink_descriptor_set_refs_clear(&obj->desc_set_refs, obj);
    cache_or_free_mem(screen, obj);
    FREE(obj);
@@ -512,6 +513,7 @@ resource_object_create(struct zink_screen *screen, const struct pipe_resource *t
    bool shared = (templ->bind & (PIPE_BIND_SHARED | PIPE_BIND_LINEAR)) == (PIPE_BIND_SHARED | PIPE_BIND_LINEAR);
 
    pipe_reference_init(&obj->reference, 1);
+   util_dynarray_init(&obj->tmp, NULL);
    util_dynarray_init(&obj->desc_set_refs.refs, NULL);
    if (templ->target == PIPE_BUFFER) {
       VkBufferCreateInfo bci = create_bci(screen, templ, templ->bind);
@@ -620,6 +622,7 @@ resource_object_create(struct zink_screen *screen, const struct pipe_resource *t
       else
         flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
    }
+   obj->alignment = reqs.alignment;
 
    if (templ->flags & PIPE_RESOURCE_FLAG_MAP_COHERENT || templ->usage == PIPE_USAGE_DYNAMIC)
       flags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -1100,20 +1103,26 @@ zink_resource_has_usage(struct zink_resource *res, enum zink_resource_access usa
    return batch_uses & usage;
 }
 
+ALWAYS_INLINE static void
+align_offset_size(const VkDeviceSize alignment, VkDeviceSize *offset, VkDeviceSize *size, VkDeviceSize obj_size)
+{
+   VkDeviceSize align = *offset % alignment;
+   if (alignment - 1 > *offset)
+      *offset = 0;
+   else
+      *offset -= align, *size += align;
+   align = alignment - (*size % alignment);
+   if (*offset + *size + align > obj_size)
+      *size = obj_size - *offset;
+   else
+      *size += align;
+}
+
 static VkMappedMemoryRange
 init_mem_range(struct zink_screen *screen, struct zink_resource *res, VkDeviceSize offset, VkDeviceSize size)
 {
    assert(res->obj->size);
-   VkDeviceSize align = offset % screen->info.props.limits.nonCoherentAtomSize;
-   if (screen->info.props.limits.nonCoherentAtomSize - 1 > offset)
-      offset = 0;
-   else
-      offset -= align, size += align;
-   align = screen->info.props.limits.nonCoherentAtomSize - (size % screen->info.props.limits.nonCoherentAtomSize);
-   if (offset + size + align > res->obj->size)
-      size = res->obj->size - offset;
-   else
-      size += align;
+   align_offset_size(screen->info.props.limits.nonCoherentAtomSize, &offset, &size, res->obj->size);
    VkMappedMemoryRange range = {
       VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
       NULL,
@@ -1510,6 +1519,28 @@ zink_resource_get_separate_stencil(struct pipe_resource *pres)
 
 }
 
+VkBuffer
+zink_resource_tmp_buffer(struct zink_screen *screen, struct zink_resource *res, unsigned offset_add, unsigned add_binds, unsigned *offset_out)
+{
+   VkBufferCreateInfo bci = create_bci(screen, &res->base.b, res->base.b.bind | add_binds);
+   VkDeviceSize size = res->obj->size - offset_add;
+   VkDeviceSize offset = res->obj->offset + offset_add;
+   if (offset_add) {
+      assert(res->obj->size > offset_add);
+
+      align_offset_size(res->obj->alignment, &offset, &size, res->obj->size);
+   }
+   bci.size = size;
+
+   VkBuffer buffer;
+   if (vkCreateBuffer(screen->dev, &bci, NULL, &buffer) != VK_SUCCESS)
+      return VK_NULL_HANDLE;
+   vkBindBufferMemory(screen->dev, buffer, res->obj->mem, offset);
+   if (offset_out)
+      *offset_out = offset_add - (offset - res->obj->offset);
+   return buffer;
+}
+
 bool
 zink_resource_object_init_storage(struct zink_context *ctx, struct zink_resource *res)
 {
@@ -1518,17 +1549,15 @@ zink_resource_object_init_storage(struct zink_context *ctx, struct zink_resource
    if (res->base.b.bind & PIPE_BIND_SHADER_IMAGE)
       return true;
    if (res->obj->is_buffer) {
-      if (res->obj->sbuffer)
+      if (res->base.b.bind & PIPE_BIND_SHADER_IMAGE)
          return true;
-      VkBufferCreateInfo bci = create_bci(screen, &res->base.b, res->base.b.bind | PIPE_BIND_SHADER_IMAGE);
-      bci.size = res->obj->size;
 
-      VkBuffer buffer;
-      if (vkCreateBuffer(screen->dev, &bci, NULL, &buffer) != VK_SUCCESS)
+      VkBuffer buffer = zink_resource_tmp_buffer(screen, res, 0, PIPE_BIND_SHADER_IMAGE, NULL);
+      if (!buffer)
          return false;
-      vkBindBufferMemory(screen->dev, buffer, res->obj->mem, res->obj->offset);
-      res->obj->sbuffer = res->obj->buffer;
+      util_dynarray_append(&res->obj->tmp, VkBuffer, res->obj->buffer);
       res->obj->buffer = buffer;
+      res->base.b.bind |= PIPE_BIND_SHADER_IMAGE;
    } else {
       zink_fb_clears_apply_region(ctx, &res->base.b, (struct u_rect){0, res->base.b.width0, 0, res->base.b.height0});
       zink_resource_image_barrier(ctx, NULL, res, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0);
