@@ -90,6 +90,7 @@ struct zink_program {
 struct zink_gfx_program {
    struct zink_program base;
 
+   struct nir_shader *nir[ZINK_SHADER_COUNT];
    struct zink_shader_module *modules[ZINK_SHADER_COUNT]; // compute stage doesn't belong here
 
    struct zink_shader_module *default_variants[ZINK_SHADER_COUNT][2]; //[default, no streamout]
@@ -97,8 +98,6 @@ struct zink_gfx_program {
    struct zink_shader *last_vertex_stage;
 
    struct zink_shader *shaders[ZINK_SHADER_COUNT];
-   unsigned char shader_slot_map[VARYING_SLOT_MAX];
-   unsigned char shader_slots_reserved;
    struct hash_table *pipelines[11]; // number of draw modes we support
 };
 
