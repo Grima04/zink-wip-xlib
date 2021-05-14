@@ -127,8 +127,6 @@ struct zink_screen {
    } mem;
    uint8_t heap_map[VK_MAX_MEMORY_TYPES];
 
-   unsigned shader_id;
-
    uint64_t total_video_mem;
    uint64_t clamp_video_mem;
    uint64_t total_mem;
