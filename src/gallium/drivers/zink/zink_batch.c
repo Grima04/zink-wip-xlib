@@ -19,6 +19,8 @@
 #endif
 #include "wsi_common.h"
 
+#include "zink_inlines.h"
+
 void
 debug_describe_zink_batch_state(char *buf, const struct zink_batch_state *ptr)
 {
@@ -608,6 +610,8 @@ zink_batch_reference_resource(struct zink_batch *batch, struct zink_resource *re
       return;
    pipe_reference(NULL, &res->obj->reference);
    batch->state->resource_size += res->obj->size;
+   zink_select_draw_vbo(batch->state->ctx);
+   zink_select_launch_grid(batch->state->ctx);
    batch->has_work = true;
 }
 
@@ -617,6 +621,8 @@ zink_batch_reference_resource_move(struct zink_batch *batch, struct zink_resourc
    if (!batch_ptr_add_usage(batch, batch->state->resources, res->obj))
       return;
    batch->state->resource_size += res->obj->size;
+   zink_select_draw_vbo(batch->state->ctx);
+   zink_select_launch_grid(batch->state->ctx);
    batch->has_work = true;
 }
 

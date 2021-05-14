@@ -402,7 +402,7 @@ update_barriers(struct zink_context *ctx, bool is_compute)
 }
 
 template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED,
-          zink_trifan HAS_TRIFANS, bool STREAMOUT, zink_drawid DRAWID, zink_basevertex BASEVERTEX>
+          zink_trifan HAS_TRIFANS, bool STREAMOUT, zink_drawid DRAWID, zink_basevertex BASEVERTEX, zink_force_flush FORCE_FLUSH>
 void
 zink_draw_vbo(struct pipe_context *pctx,
               const struct pipe_draw_info *dinfo,
@@ -782,12 +782,12 @@ zink_draw_vbo(struct pipe_context *pctx,
    batch->has_work = true;
    ctx->batch.state->draw_count = draw_count;
    /* flush if there's >100k draws */
-   if (unlikely(ctx->batch.state->resource_size >= ctx->screen->total_video_mem / 2 ||
+   if (unlikely(FORCE_FLUSH ||
                 draw_count >= 100000))
       pctx->flush(pctx, NULL, PIPE_FLUSH_ASYNC);
 }
 
-template <zink_work_dim NEEDS_WORK_DIM, bool BATCH_CHANGED>
+template <zink_work_dim NEEDS_WORK_DIM, bool BATCH_CHANGED, zink_force_flush FORCE_FLUSH>
 static void
 zink_launch_grid(struct pipe_context *pctx, const struct pipe_grid_info *info)
 {
@@ -835,9 +835,18 @@ zink_launch_grid(struct pipe_context *pctx, const struct pipe_grid_info *info)
       vkCmdDispatch(batch->state->cmdbuf, info->grid[0], info->grid[1], info->grid[2]);
    batch->has_work = true;
    /* flush if there's >100k computes */
-   if (unlikely(ctx->batch.state->resource_size >= ctx->screen->total_video_mem / 2 ||
+   if (unlikely(FORCE_FLUSH ||
                 ctx->batch.state->compute_count >= 100000))
       pctx->flush(pctx, NULL, PIPE_FLUSH_ASYNC);
+}
+
+template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS,
+          bool STREAMOUT, zink_drawid DRAWID, zink_basevertex BASEVERTEX, zink_force_flush FORCE_FLUSH>
+static void
+init_force_flush_functions(struct zink_context *ctx)
+{
+   ctx->draw_vbo[HAS_MULTIDRAW][HAS_DYNAMIC_STATE][BATCH_CHANGED][HAS_TRIFANS][STREAMOUT][DRAWID][BASEVERTEX][FORCE_FLUSH] =
+   zink_draw_vbo<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT, DRAWID, BASEVERTEX, FORCE_FLUSH>;
 }
 
 template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS,
@@ -845,8 +854,8 @@ template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bo
 static void
 init_basevertex_functions(struct zink_context *ctx)
 {
-   ctx->draw_vbo[HAS_MULTIDRAW][HAS_DYNAMIC_STATE][BATCH_CHANGED][HAS_TRIFANS][STREAMOUT][DRAWID][BASEVERTEX] =
-   zink_draw_vbo<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT, DRAWID, BASEVERTEX>;
+   init_force_flush_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT, DRAWID, BASEVERTEX, ZINK_NO_FLUSH>(ctx);
+   init_force_flush_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT, DRAWID, BASEVERTEX, ZINK_FORCE_FLUSH>(ctx);
 }
 
 template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS,
@@ -906,11 +915,19 @@ init_all_draw_functions(struct zink_context *ctx)
    init_multidraw_functions<ZINK_MULTIDRAW>(ctx);
 }
 
+template <zink_work_dim NEEDS_WORK_DIM, bool BATCH_CHANGED, zink_force_flush FORCE_FLUSH>
+static void
+init_grid_force_flush_functions(struct zink_context *ctx)
+{
+   ctx->launch_grid[NEEDS_WORK_DIM][BATCH_CHANGED][FORCE_FLUSH] = zink_launch_grid<NEEDS_WORK_DIM, BATCH_CHANGED, FORCE_FLUSH>;
+}
+
 template <zink_work_dim NEEDS_WORK_DIM, bool BATCH_CHANGED>
 static void
 init_grid_batch_changed_functions(struct zink_context *ctx)
 {
-   ctx->launch_grid[NEEDS_WORK_DIM][BATCH_CHANGED] = zink_launch_grid<NEEDS_WORK_DIM, BATCH_CHANGED>;
+   init_grid_force_flush_functions<NEEDS_WORK_DIM, BATCH_CHANGED, ZINK_NO_FLUSH>(ctx);
+   init_grid_force_flush_functions<NEEDS_WORK_DIM, BATCH_CHANGED, ZINK_FORCE_FLUSH>(ctx);
 }
 
 template <zink_work_dim NEEDS_WORK_DIM>

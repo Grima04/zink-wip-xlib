@@ -175,6 +175,11 @@ typedef enum {
    ZINK_READS_WORK_DIM,
 } zink_work_dim;
 
+typedef enum {
+   ZINK_NO_FLUSH,
+   ZINK_FORCE_FLUSH,
+} zink_force_flush;
+
 struct zink_context {
    struct pipe_context base;
    struct threaded_context *tc;
@@ -185,9 +190,9 @@ struct zink_context {
 
    zink_multidraw multidraw : 1;
    zink_dynamic_state dynamic_state : 1;
-   pipe_draw_vbo_func draw_vbo[2][2][2][2][2][2][2]; //multidraw, dynamic state, batch changed, trifan, streamout, reads drawid,
-                                                     //reads basevertex
-   pipe_launch_grid_func launch_grid[2][2]; //work_dim, batch changed
+   pipe_draw_vbo_func draw_vbo[2][2][2][2][2][2][2][2]; //multidraw, dynamic state, batch changed, trifan, streamout, reads drawid,
+                                                     //reads basevertex, force flush
+   pipe_launch_grid_func launch_grid[2][2][2]; //work_dim, batch changed, force flush
 
    struct pipe_device_reset_callback reset;
 
