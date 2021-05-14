@@ -7,8 +7,9 @@ zink_select_draw_vbo(struct zink_context *ctx)
 {
    if (!ctx->gfx_stages[PIPE_SHADER_VERTEX])
       return;
-   ctx->base.draw_vbo = ctx->draw_vbo[ctx->multidraw][ctx->dynamic_state][ctx->pipeline_changed[0]]
-                                     [ctx->screen->have_triangle_fans][ctx->num_so_targets > 0]
+   ctx->base.draw_vbo = ctx->draw_vbo[ctx->multidraw][ctx->dynamic_state]
+                                     [ctx->screen->have_triangle_fans]
+                                     [ctx->pipeline_changed[0]][ctx->num_so_targets > 0]
                                      [BITSET_TEST(ctx->gfx_stages[PIPE_SHADER_VERTEX]->nir->info.system_values_read, SYSTEM_VALUE_DRAW_ID)]
                                      [BITSET_TEST(ctx->gfx_stages[PIPE_SHADER_VERTEX]->nir->info.system_values_read, SYSTEM_VALUE_BASE_VERTEX)]
                                      [ctx->oom_flush];

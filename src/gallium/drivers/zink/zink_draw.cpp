@@ -402,8 +402,8 @@ update_barriers(struct zink_context *ctx, bool is_compute)
    }
 }
 
-template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED,
-          zink_trifan HAS_TRIFANS, bool STREAMOUT, zink_drawid DRAWID, zink_basevertex BASEVERTEX, zink_force_flush FORCE_FLUSH>
+template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, zink_trifan HAS_TRIFANS, bool BATCH_CHANGED,
+          bool STREAMOUT, zink_drawid DRAWID, zink_basevertex BASEVERTEX, zink_force_flush FORCE_FLUSH>
 void
 zink_draw_vbo(struct pipe_context *pctx,
               const struct pipe_draw_info *dinfo,
@@ -841,64 +841,64 @@ zink_launch_grid(struct pipe_context *pctx, const struct pipe_grid_info *info)
       pctx->flush(pctx, NULL, 0);
 }
 
-template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS,
+template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, zink_trifan HAS_TRIFANS, bool BATCH_CHANGED,
           bool STREAMOUT, zink_drawid DRAWID, zink_basevertex BASEVERTEX, zink_force_flush FORCE_FLUSH>
 static void
 init_force_flush_functions(struct zink_context *ctx)
 {
-   ctx->draw_vbo[HAS_MULTIDRAW][HAS_DYNAMIC_STATE][BATCH_CHANGED][HAS_TRIFANS][STREAMOUT][DRAWID][BASEVERTEX][FORCE_FLUSH] =
-   zink_draw_vbo<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT, DRAWID, BASEVERTEX, FORCE_FLUSH>;
+   ctx->draw_vbo[HAS_MULTIDRAW][HAS_DYNAMIC_STATE][HAS_TRIFANS][BATCH_CHANGED][STREAMOUT][DRAWID][BASEVERTEX][FORCE_FLUSH] =
+   zink_draw_vbo<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, HAS_TRIFANS, BATCH_CHANGED, STREAMOUT, DRAWID, BASEVERTEX, FORCE_FLUSH>;
 }
 
-template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS,
+template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, zink_trifan HAS_TRIFANS, bool BATCH_CHANGED,
           bool STREAMOUT, zink_drawid DRAWID, zink_basevertex BASEVERTEX>
 static void
 init_basevertex_functions(struct zink_context *ctx)
 {
-   init_force_flush_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT, DRAWID, BASEVERTEX, ZINK_NO_FLUSH>(ctx);
-   init_force_flush_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT, DRAWID, BASEVERTEX, ZINK_FORCE_FLUSH>(ctx);
+   init_force_flush_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, HAS_TRIFANS, BATCH_CHANGED, STREAMOUT, DRAWID, BASEVERTEX, ZINK_NO_FLUSH>(ctx);
+   init_force_flush_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, HAS_TRIFANS, BATCH_CHANGED, STREAMOUT, DRAWID, BASEVERTEX, ZINK_FORCE_FLUSH>(ctx);
 }
 
-template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS,
+template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, zink_trifan HAS_TRIFANS, bool BATCH_CHANGED,
           bool STREAMOUT, zink_drawid DRAWID>
 static void
 init_drawid_functions(struct zink_context *ctx)
 {
-   init_basevertex_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT, DRAWID, ZINK_NO_BASEVERTEX>(ctx);
-   init_basevertex_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT, DRAWID, ZINK_BASEVERTEX>(ctx);
+   init_basevertex_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, HAS_TRIFANS, BATCH_CHANGED, STREAMOUT, DRAWID, ZINK_NO_BASEVERTEX>(ctx);
+   init_basevertex_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, HAS_TRIFANS, BATCH_CHANGED, STREAMOUT, DRAWID, ZINK_BASEVERTEX>(ctx);
 }
 
-template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS,
+template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, zink_trifan HAS_TRIFANS, bool BATCH_CHANGED,
           bool STREAMOUT>
 static void
 init_streamout_functions(struct zink_context *ctx)
 {
-   init_drawid_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT, ZINK_NO_DRAWID>(ctx);
-   init_drawid_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, STREAMOUT, ZINK_DRAWID>(ctx);
+   init_drawid_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, HAS_TRIFANS, BATCH_CHANGED, STREAMOUT, ZINK_NO_DRAWID>(ctx);
+   init_drawid_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, HAS_TRIFANS, BATCH_CHANGED, STREAMOUT, ZINK_DRAWID>(ctx);
 }
 
-template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS>
-static void
-init_trifan_functions(struct zink_context *ctx)
-{
-   init_streamout_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, false>(ctx);
-   init_streamout_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, HAS_TRIFANS, true>(ctx);
-}
-
-template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED>
+template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, zink_trifan HAS_TRIFANS, bool BATCH_CHANGED>
 static void
 init_batch_changed_functions(struct zink_context *ctx)
 {
-   init_trifan_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, ZINK_NO_TRIFAN>(ctx);
-   init_trifan_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, BATCH_CHANGED, ZINK_TRIFAN>(ctx);
+   init_streamout_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, HAS_TRIFANS, BATCH_CHANGED, false>(ctx);
+   init_streamout_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, HAS_TRIFANS, BATCH_CHANGED, true>(ctx);
+}
+
+template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, zink_trifan HAS_TRIFANS>
+static void
+init_trifan_functions(struct zink_context *ctx)
+{
+   init_batch_changed_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, HAS_TRIFANS, false>(ctx);
+   init_batch_changed_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, HAS_TRIFANS, true>(ctx);
 }
 
 template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE>
 static void
 init_dynamic_state_functions(struct zink_context *ctx)
 {
-   init_batch_changed_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, false>(ctx);
-   init_batch_changed_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, true>(ctx);
+   init_trifan_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, ZINK_NO_TRIFAN>(ctx);
+   init_trifan_functions<HAS_MULTIDRAW, HAS_DYNAMIC_STATE, ZINK_TRIFAN>(ctx);
 }
 
 template <zink_multidraw HAS_MULTIDRAW>
