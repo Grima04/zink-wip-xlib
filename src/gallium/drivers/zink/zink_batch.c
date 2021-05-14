@@ -539,14 +539,7 @@ zink_end_batch(struct zink_context *ctx, struct zink_batch *batch)
    struct zink_screen *screen = zink_screen(ctx->base.screen);
    while (util_dynarray_contains(&batch->state->persistent_resources, struct zink_resource_object*)) {
       struct zink_resource_object *obj = util_dynarray_pop(&batch->state->persistent_resources, struct zink_resource_object*);
-       assert(!obj->offset);
-       VkMappedMemoryRange range = {
-          VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
-          NULL,
-          obj->mem,
-          obj->offset,
-          VK_WHOLE_SIZE,
-       };
+       VkMappedMemoryRange range = zink_resource_init_mem_range(screen, obj, 0, obj->size);
        vkFlushMappedMemoryRanges(screen->dev, 1, &range);
    }
 
