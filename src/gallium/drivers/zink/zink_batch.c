@@ -91,7 +91,6 @@ zink_reset_batch_state(struct zink_context *ctx, struct zink_batch_state *bs)
 
    pipe_resource_reference(&bs->flush_res, NULL);
 
-   ctx->resource_size -= bs->resource_size;
    bs->resource_size = 0;
 
    /* only reset submitted here so that tc fence desync can pick up the 'completed' flag
@@ -551,8 +550,22 @@ zink_end_batch(struct zink_context *ctx, struct zink_batch *batch)
        vkFlushMappedMemoryRanges(screen->dev, 1, &range);
    }
 
-   ctx->resource_size += batch->state->resource_size;
    ctx->last_fence = &batch->state->fence;
+   if (ctx->oom_flush || _mesa_hash_table_num_entries(&ctx->batch_states) > 10) {
+      simple_mtx_lock(&ctx->batch_mtx);
+      hash_table_foreach(&ctx->batch_states, he) {
+         struct zink_fence *fence = he->data;
+         struct zink_batch_state *bs = he->data;
+         if (zink_check_batch_completion(ctx, fence->batch_id)) {
+            zink_reset_batch_state(ctx, he->data);
+            _mesa_hash_table_remove(&ctx->batch_states, he);
+            util_dynarray_append(&ctx->free_batch_states, struct zink_batch_state *, bs);
+         }
+      }
+      simple_mtx_unlock(&ctx->batch_mtx);
+      if (_mesa_hash_table_num_entries(&ctx->batch_states) > 50)
+         ctx->oom_flush = true;
+   }
 
    if (screen->device_lost)
       return;
@@ -603,6 +616,18 @@ batch_ptr_add_usage(struct zink_batch *batch, struct set *s, void *ptr)
    return !found;
 }
 
+ALWAYS_INLINE static void
+check_oom_flush(struct zink_context *ctx, const struct zink_batch *batch)
+{
+   const VkDeviceSize resource_size = batch->state->resource_size;
+   if (resource_size >= ctx->screen->clamp_video_mem) {
+       ctx->oom_flush = true;
+       ctx->oom_stall = true;
+       zink_select_draw_vbo(ctx);
+       zink_select_launch_grid(ctx);
+    }
+}
+
 void
 zink_batch_reference_resource(struct zink_batch *batch, struct zink_resource *res)
 {
@@ -610,8 +635,7 @@ zink_batch_reference_resource(struct zink_batch *batch, struct zink_resource *re
       return;
    pipe_reference(NULL, &res->obj->reference);
    batch->state->resource_size += res->obj->size;
-   zink_select_draw_vbo(batch->state->ctx);
-   zink_select_launch_grid(batch->state->ctx);
+   check_oom_flush(batch->state->ctx, batch);
    batch->has_work = true;
 }
 
@@ -621,8 +645,7 @@ zink_batch_reference_resource_move(struct zink_batch *batch, struct zink_resourc
    if (!batch_ptr_add_usage(batch, batch->state->resources, res->obj))
       return;
    batch->state->resource_size += res->obj->size;
-   zink_select_draw_vbo(batch->state->ctx);
-   zink_select_launch_grid(batch->state->ctx);
+   check_oom_flush(batch->state->ctx, batch);
    batch->has_work = true;
 }
 

@@ -11,7 +11,7 @@ zink_select_draw_vbo(struct zink_context *ctx)
                                      [ctx->screen->have_triangle_fans][ctx->num_so_targets > 0]
                                      [BITSET_TEST(ctx->gfx_stages[PIPE_SHADER_VERTEX]->nir->info.system_values_read, SYSTEM_VALUE_DRAW_ID)]
                                      [BITSET_TEST(ctx->gfx_stages[PIPE_SHADER_VERTEX]->nir->info.system_values_read, SYSTEM_VALUE_BASE_VERTEX)]
-                                     [ctx->batch.state->resource_size >= ctx->screen->total_video_mem / 2];
+                                     [ctx->oom_flush];
    assert(ctx->base.draw_vbo);
 }
 
@@ -21,7 +21,7 @@ zink_select_launch_grid(struct zink_context *ctx)
    if (!ctx->compute_stage)
       return;
    ctx->base.launch_grid = ctx->launch_grid[BITSET_TEST(ctx->compute_stage->nir->info.system_values_read, SYSTEM_VALUE_WORK_DIM)][ctx->pipeline_changed[1]]
-                                           [ctx->batch.state->resource_size >= ctx->screen->total_video_mem / 2];
+                                           [ctx->oom_flush];
    assert(ctx->base.launch_grid);
 }
 
