@@ -1221,7 +1221,7 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
                      (struct pipe_resource **)&trans->staging_res, (void **)&ptr);
          assert(trans->staging_res);
          res = zink_resource(trans->staging_res);
-         trans->offset = offset;
+         trans->offset = offset + box->x;
          usage |= PIPE_MAP_UNSYNCHRONIZED;
       } else {
          /* At this point, the buffer is always idle (we checked it above). */
@@ -1279,7 +1279,7 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
 #endif
       ) {
       VkDeviceSize size = box->width;
-      VkDeviceSize offset = res->obj->offset + trans->offset + box->x;
+      VkDeviceSize offset = res->obj->offset + trans->offset;
       VkMappedMemoryRange range = zink_resource_init_mem_range(screen, res->obj, offset, size);
       if (vkInvalidateMappedMemoryRanges(screen->dev, 1, &range) != VK_SUCCESS) {
          vkUnmapMemory(screen->dev, res->obj->mem);
@@ -1437,7 +1437,7 @@ zink_transfer_flush_region(struct pipe_context *pctx,
       ASSERTED VkDeviceSize size, offset;
       if (m->obj->is_buffer) {
          size = box->width;
-         offset = trans->offset + box->x;
+         offset = trans->offset;
       } else {
          size = box->width * box->height * util_format_get_blocksize(m->base.b.format);
          offset = trans->offset +
