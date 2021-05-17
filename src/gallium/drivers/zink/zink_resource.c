@@ -683,6 +683,9 @@ resource_object_create(struct zink_screen *screen, const struct pipe_resource *t
       if (1) {
          enum zink_alloc_flag aflags = templ->flags & PIPE_RESOURCE_FLAG_SPARSE ? ZINK_ALLOC_SPARSE : 0;
          unsigned alignment = MAX2(reqs.alignment, 256);
+         if (templ->usage == PIPE_USAGE_STAGING && obj->is_buffer)
+            alignment = MAX2(alignment, screen->info.props.limits.minMemoryMapAlignment);
+         obj->alignment = alignment;
          obj->bo = zink_bo(zink_bo_create(screen, reqs.size, alignment, mem_type.propertyFlags, aflags));
          obj->offset = zink_bo_get_offset(obj->bo);
          obj->mem = zink_bo_get_mem(obj->bo);
