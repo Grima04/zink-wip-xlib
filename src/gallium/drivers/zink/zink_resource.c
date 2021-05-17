@@ -1223,6 +1223,7 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
          res = zink_resource(trans->staging_res);
          trans->offset = offset + box->x;
          usage |= PIPE_MAP_UNSYNCHRONIZED;
+         ptr = ((uint8_t *)ptr) + box->x;
       } else {
          /* At this point, the buffer is always idle (we checked it above). */
          usage |= PIPE_MAP_UNSYNCHRONIZED;
@@ -1266,6 +1267,7 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
       assert(ptr);
       if (!ptr)
          return NULL;
+      ptr = ((uint8_t *)ptr) + box->x;
    }
 
    if (!res->obj->coherent
@@ -1325,8 +1327,7 @@ zink_transfer_map(struct pipe_context *pctx,
 
    void *ptr, *base;
    if (pres->target == PIPE_BUFFER) {
-      base = buffer_transfer_map(ctx, res, usage, box, trans);
-      ptr = ((uint8_t *)base) + box->x;
+      ptr = base = buffer_transfer_map(ctx, res, usage, box, trans);
    } else {
       if (usage & PIPE_MAP_WRITE && !(usage & PIPE_MAP_READ))
          /* this is like a blit, so we can potentially dump some clears or maybe we have to  */
