@@ -1195,15 +1195,13 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
       }
    }
 
-   if ((usage & PIPE_MAP_WRITE) &&
-       (usage & PIPE_MAP_DISCARD_RANGE ||
-        (!(usage & PIPE_MAP_READ) && zink_resource_has_usage(res)) ||
-        !res->obj->host_visible ||
+   if (usage & PIPE_MAP_DISCARD_RANGE &&
+        (!res->obj->host_visible ||
         !(usage & (PIPE_MAP_UNSYNCHRONIZED | PIPE_MAP_PERSISTENT)))) {
       /* Check if mapping this buffer would cause waiting for the GPU.
        */
 
-      if (!res->obj->host_visible || !zink_resource_usage_check_completion(screen, res, ZINK_RESOURCE_ACCESS_RW) || res->base.b.usage != PIPE_USAGE_STAGING) {
+      if (!res->obj->host_visible || !zink_resource_usage_check_completion(screen, res, ZINK_RESOURCE_ACCESS_RW)) {
          /* Do a wait-free write-only transfer using a temporary buffer. */
          unsigned offset;
 
