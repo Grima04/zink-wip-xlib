@@ -1144,7 +1144,9 @@ map_resource(struct zink_screen *screen, struct zink_resource *res)
       return zink_bo_map(screen, res->obj->bo);
    result = vkMapMemory(screen->dev, res->obj->mem, res->obj->offset,
                         res->obj->size, 0, &res->obj->map);
-   return result == VK_SUCCESS ? res->obj->map : NULL;
+   if (zink_screen_handle_vkresult(screen, result))
+      return res->obj->map;
+   return NULL;
 }
 
 static void
