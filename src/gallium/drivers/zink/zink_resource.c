@@ -1237,13 +1237,14 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
          if (!zink_resource_usage_check_completion(screen, res, ZINK_RESOURCE_ACCESS_WRITE))
             return NULL;
       } else if (!res->obj->host_visible || res->base.b.usage != PIPE_USAGE_STAGING) {
-         trans->staging_res = pipe_buffer_create(&screen->base, PIPE_BIND_LINEAR, PIPE_USAGE_STAGING, box->x + box->width);
+         trans->staging_res = pipe_buffer_create(&screen->base, PIPE_BIND_LINEAR, PIPE_USAGE_STAGING, box->width);
          if (!trans->staging_res)
             return NULL;
          struct zink_resource *staging_res = zink_resource(trans->staging_res);
-         zink_copy_buffer(ctx, NULL, staging_res, res, box->x, box->x, box->width);
+         zink_copy_buffer(ctx, NULL, staging_res, res, 0, box->x, box->width);
          res = staging_res;
          usage &= ~PIPE_MAP_UNSYNCHRONIZED;
+         ptr = map_resource(screen, res);
       }
    }
 
