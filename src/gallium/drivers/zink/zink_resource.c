@@ -1220,6 +1220,7 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
          assert(trans->staging_res);
          res = zink_resource(trans->staging_res);
          trans->offset = offset;
+         usage |= PIPE_MAP_UNSYNCHRONIZED;
       } else {
          /* At this point, the buffer is always idle (we checked it above). */
          usage |= PIPE_MAP_UNSYNCHRONIZED;
@@ -1240,13 +1241,17 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
          trans->offset = staging_res->obj->offset;
          zink_copy_buffer(ctx, NULL, staging_res, res, box->x, box->x, box->width);
          res = staging_res;
-         zink_fence_wait(&ctx->base);
-      } else {
-         if (!(usage & PIPE_MAP_WRITE))
-            zink_resource_usage_wait(ctx, res, ZINK_RESOURCE_ACCESS_WRITE);
-         else
-            zink_resource_usage_wait(ctx, res, ZINK_RESOURCE_ACCESS_RW);
+         usage &= ~PIPE_MAP_UNSYNCHRONIZED;
       }
+   }
+
+   if (!(usage & PIPE_MAP_UNSYNCHRONIZED)) {
+      if (usage & PIPE_MAP_WRITE)
+         zink_resource_usage_wait(ctx, res, ZINK_RESOURCE_ACCESS_RW);
+      else
+         zink_resource_usage_wait(ctx, res, ZINK_RESOURCE_ACCESS_WRITE);
+      res->access = 0;
+      res->access_stage = 0;
    }
 
    if (!ptr) {
