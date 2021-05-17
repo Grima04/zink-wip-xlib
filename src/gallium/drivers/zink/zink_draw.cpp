@@ -479,7 +479,20 @@ zink_draw_vbo(struct pipe_context *pctx,
       uint32_t restart_index = util_prim_restart_index_from_size(index_size);
       if ((dinfo->primitive_restart && (dinfo->restart_index != restart_index)) ||
           (!ctx->screen->info.have_EXT_index_type_uint8 && index_size == 1)) {
+         struct zink_batch_state *bs = batch->state;
          util_translate_prim_restart_ib(pctx, dinfo, dindirect, &draws[0], &index_buffer);
+         /* FIXME: move all of this to u_vbuf */
+         if (bs != batch->state) {
+            if (!BATCH_CHANGED || ctx->screen->descriptors_update(ctx, false)) {
+               struct pipe_draw_info info = *dinfo;
+               info.restart_index = restart_index;
+               info.index.resource = index_buffer;
+               info.index_size = MAX2(index_size, 2);
+               zink_select_draw_vbo(ctx);
+               pctx->draw_vbo(pctx, &info, drawid_offset, dindirect, draws, num_draws);
+               return;
+            }
+         }
          need_index_buffer_unref = true;
          index_size = MAX2(index_size, 2);
          zink_batch_reference_resource_move(batch, zink_resource(index_buffer));
