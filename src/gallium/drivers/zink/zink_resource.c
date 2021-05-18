@@ -1231,14 +1231,16 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
    } else if (((usage & PIPE_MAP_READ) && !(usage & PIPE_MAP_PERSISTENT) && res->base.b.usage != PIPE_USAGE_STAGING) || !res->obj->host_visible) {
       assert(!(usage & (TC_TRANSFER_MAP_THREADED_UNSYNC | PIPE_MAP_THREAD_SAFE)));
       if (!res->obj->host_visible || !(usage & PIPE_MAP_ONCE)) {
-         trans->staging_res = pipe_buffer_create(&screen->base, PIPE_BIND_LINEAR, PIPE_USAGE_STAGING, box->width);
+         trans->offset = box->x % screen->info.props.limits.minMemoryMapAlignment;
+         trans->staging_res = pipe_buffer_create(&screen->base, PIPE_BIND_LINEAR, PIPE_USAGE_STAGING, box->width + trans->offset);
          if (!trans->staging_res)
             return NULL;
          struct zink_resource *staging_res = zink_resource(trans->staging_res);
-         zink_copy_buffer(ctx, NULL, staging_res, res, 0, box->x, box->width);
+         zink_copy_buffer(ctx, NULL, staging_res, res, trans->offset, box->x, box->width);
          res = staging_res;
          usage &= ~PIPE_MAP_UNSYNCHRONIZED;
          ptr = map_resource(screen, res);
+         ptr = ((uint8_t *)ptr) + trans->offset;
       }
    } else if (usage & PIPE_MAP_DONTBLOCK) {
       /* sparse/device-local will always need to wait since it has to copy */
