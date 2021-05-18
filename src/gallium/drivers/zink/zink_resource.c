@@ -1236,6 +1236,7 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
             return NULL;
          if (!zink_resource_usage_check_completion(screen, res, ZINK_RESOURCE_ACCESS_WRITE))
             return NULL;
+         usage |= PIPE_MAP_UNSYNCHRONIZED;
       } else if (!res->obj->host_visible || (!(usage & PIPE_MAP_ONCE) && res->base.b.usage != PIPE_USAGE_STAGING)) {
          trans->staging_res = pipe_buffer_create(&screen->base, PIPE_BIND_LINEAR, PIPE_USAGE_STAGING, box->width);
          if (!trans->staging_res)
