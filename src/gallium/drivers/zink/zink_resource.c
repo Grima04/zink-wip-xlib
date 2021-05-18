@@ -1228,17 +1228,9 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
          /* At this point, the buffer is always idle (we checked it above). */
          usage |= PIPE_MAP_UNSYNCHRONIZED;
       }
-   } else if (((usage & PIPE_MAP_READ) && !(usage & PIPE_MAP_PERSISTENT)) || !res->obj->host_visible) {
+   } else if (((usage & PIPE_MAP_READ) && !(usage & PIPE_MAP_PERSISTENT) && res->base.b.usage != PIPE_USAGE_STAGING) || !res->obj->host_visible) {
       assert(!(usage & (TC_TRANSFER_MAP_THREADED_UNSYNC | PIPE_MAP_THREAD_SAFE)));
-      if (usage & PIPE_MAP_DONTBLOCK) {
-         /* sparse/device-local will always need to wait since it has to copy */
-         if (!res->obj->host_visible)
-            return NULL;
-         if (!zink_resource_usage_check_completion(screen, res, ZINK_RESOURCE_ACCESS_WRITE))
-            return NULL;
-         usage |= PIPE_MAP_UNSYNCHRONIZED;
-      }
-      if (!res->obj->host_visible || (!(usage & PIPE_MAP_ONCE) && res->base.b.usage != PIPE_USAGE_STAGING)) {
+      if (!res->obj->host_visible || !(usage & PIPE_MAP_ONCE)) {
          trans->staging_res = pipe_buffer_create(&screen->base, PIPE_BIND_LINEAR, PIPE_USAGE_STAGING, box->width);
          if (!trans->staging_res)
             return NULL;
@@ -1248,6 +1240,13 @@ buffer_transfer_map(struct zink_context *ctx, struct zink_resource *res, unsigne
          usage &= ~PIPE_MAP_UNSYNCHRONIZED;
          ptr = map_resource(screen, res);
       }
+   } else if (usage & PIPE_MAP_DONTBLOCK) {
+      /* sparse/device-local will always need to wait since it has to copy */
+      if (!res->obj->host_visible)
+         return NULL;
+      if (!zink_resource_usage_check_completion(screen, res, ZINK_RESOURCE_ACCESS_WRITE))
+         return NULL;
+      usage |= PIPE_MAP_UNSYNCHRONIZED;
    }
 
    if (!(usage & PIPE_MAP_UNSYNCHRONIZED)) {
