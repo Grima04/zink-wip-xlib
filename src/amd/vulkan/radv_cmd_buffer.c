@@ -5436,6 +5436,19 @@ radv_emit_draw_packets_indexed(struct radv_cmd_buffer *cmd_buffer,
       }
    } else {
       if (vertexOffset) {
+         if (cmd_buffer->device->physical_device->rad_info.chip_class == GFX10) {
+            /* GFX10 has a bug that consecutive draw packets with NOT_EOP must not have
+             * count == 0 for the last draw that doesn't have NOT_EOP.
+             */
+            while (drawCount > 1) {
+               const VkMultiDrawInfoEXT *last = (const VkMultiDrawInfoEXT*)(((const uint8_t*)minfo) + (drawCount - 1) * stride);
+               if (!last->count)
+                  drawCount--;
+               else
+                  break;
+            }
+         }
+
          radv_emit_userdata_vertex(cmd_buffer, info, *vertexOffset);
          vk_foreach_multi_draw(draw, i, minfo, drawCount, stride,
             const uint32_t remaining_indexes = MAX2(state->max_index_count, draw->first) - draw->first;
