@@ -414,23 +414,15 @@ populate_sets(struct zink_context *ctx, struct zink_program *pg, uint8_t *change
             return false;
    } else
       sets[0] = VK_NULL_HANDLE;
-   /* may have flushed */
-   if (bs != ctx->batch.state)
-      *changed_sets = pg->dd->binding_usage;
+   /* no flushing allowed */
+   assert(ctx->batch.state == bs);
    bs = ctx->batch.state;
    u_foreach_bit(type, *changed_sets) {
       if (pg->dd->layout_key[type]) {
          struct zink_descriptor_pool *pool = get_descriptor_pool_lazy(ctx, pg, type, bs, pg->is_compute);
          sets[type + 1] = get_descriptor_set_lazy(ctx, pg, type, pool, pg->is_compute);
-         if (ctx->batch.state != bs && (sets[0] || type != ffs(*changed_sets))) {
-               /* sets are allocated by batch state, so if flush occurs on anything
-                * but the first set that has been fetched here, get all new sets
-                */
-               *changed_sets = pg->dd->binding_usage;
-               if (pg->dd->push_usage)
-                  need_push = true;
-               return populate_sets(ctx, pg, changed_sets, need_push, sets);
-         }
+         /* no flushing allowed */
+         assert(ctx->batch.state == bs);
       } else
          sets[type + 1] = ctx->dd->dummy_set;
       if (!sets[type + 1])
@@ -495,6 +487,8 @@ zink_descriptors_update_lazy(struct zink_context *ctx, bool is_compute)
       changed_sets = pg->dd->binding_usage & dd_lazy(ctx)->state_changed[is_compute];
       dd_lazy(ctx)->push_state_changed[is_compute] = !!pg->dd->push_usage;
    }
+   /* no flushing allowed */
+   assert(ctx->batch.state == bs);
    bs = ctx->batch.state;
 
    if (pg->dd->binding_usage && changed_sets) {

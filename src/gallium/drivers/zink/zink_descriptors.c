@@ -804,15 +804,13 @@ skip_hash_tables:
       }
    }
 
-   if (pool->num_sets_allocated == ZINK_DEFAULT_MAX_DESCS) {
-      simple_mtx_unlock(&pool->mtx);
-      zink_fence_wait(&ctx->base);
-      zink_batch_reference_program(batch, pg);
-      return zink_descriptor_set_get(ctx, type, is_compute, cache_hit);
-   }
+   assert(pool->num_sets_allocated < ZINK_DEFAULT_MAX_DESCS);
 
    zds = allocate_desc_set(ctx, pg, type, descs_used, is_compute);
 out:
+   if (unlikely(pool->num_sets_allocated >= ZINK_DEFAULT_DESC_CLAMP &&
+                _mesa_hash_table_num_entries(pool->free_desc_sets) < ZINK_DEFAULT_MAX_DESCS - ZINK_DEFAULT_DESC_CLAMP))
+      ctx->oom_flush = ctx->oom_stall = true;
    zds->hash = hash;
    populate_zds_key(ctx, type, is_compute, &zds->key, pg->dd->push_usage);
    zds->recycled = false;
