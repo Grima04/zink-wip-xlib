@@ -423,7 +423,7 @@ zink_draw_vbo(struct pipe_context *pctx,
    VkDeviceSize counter_buffer_offsets[PIPE_MAX_SO_OUTPUTS];
    bool need_index_buffer_unref = false;
    bool mode_changed = ctx->gfx_pipeline_state.mode != dinfo->mode;
-   unsigned draw_count = ctx->batch.state->draw_count;
+   unsigned work_count = ctx->batch.work_count;
    enum pipe_prim_type mode = dinfo->mode;
 
    update_barriers(ctx, false);
@@ -732,7 +732,7 @@ zink_draw_vbo(struct pipe_context *pctx,
    }
 
    bool needs_drawid = DRAWID && ctx->drawid_broken;
-   draw_count += num_draws;
+   work_count += num_draws;
    if (index_size > 0) {
       if (dindirect && dindirect->buffer) {
          assert(num_draws == 1);
@@ -794,10 +794,9 @@ zink_draw_vbo(struct pipe_context *pctx,
       ctx->screen->vk_CmdEndTransformFeedbackEXT(batch->state->cmdbuf, 0, ctx->num_so_targets, counter_buffers, counter_buffer_offsets);
    }
    batch->has_work = true;
-   ctx->batch.state->draw_count = draw_count;
+   ctx->batch.work_count = work_count;
    /* flush if there's >100k draws */
-   if (unlikely(FORCE_FLUSH ||
-                draw_count >= 100000))
+   if (unlikely(FORCE_FLUSH || work_count >= 100000))
       pctx->flush(pctx, NULL, PIPE_FLUSH_ASYNC);
 }
 
@@ -841,7 +840,7 @@ zink_launch_grid(struct pipe_context *pctx, const struct pipe_grid_info *info)
                          offsetof(struct zink_cs_push_constant, work_dim), sizeof(uint32_t),
                          &info->work_dim);
 
-   batch->state->compute_count++;
+   batch->work_count++;
    if (info->indirect) {
       vkCmdDispatchIndirect(batch->state->cmdbuf, zink_resource(info->indirect)->obj->buffer, info->indirect_offset);
       zink_batch_reference_resource_rw(batch, zink_resource(info->indirect), false);
@@ -850,7 +849,7 @@ zink_launch_grid(struct pipe_context *pctx, const struct pipe_grid_info *info)
    batch->has_work = true;
    /* flush if there's >100k computes */
    if (unlikely(FORCE_FLUSH ||
-                ctx->batch.state->compute_count >= 100000))
+                ctx->batch.work_count >= 100000))
       pctx->flush(pctx, NULL, PIPE_FLUSH_ASYNC);
 }
 
