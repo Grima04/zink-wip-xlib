@@ -438,14 +438,13 @@ zink_descriptor_set_update_lazy(struct zink_context *ctx, struct zink_program *p
    screen->vk_UpdateDescriptorSetWithTemplate(screen->dev, set, pg->dd->layouts[type + 1]->desc_template, ctx);
 }
 
-bool
+void
 zink_descriptors_update_lazy(struct zink_context *ctx, bool is_compute)
 {
    struct zink_screen *screen = zink_screen(ctx->base.screen);
    struct zink_batch *batch = &ctx->batch;
    struct zink_batch_state *bs = ctx->batch.state;
    struct zink_program *pg = is_compute ? &ctx->curr_compute->base : &ctx->curr_program->base;
-   bool ret = false;
 
    bool batch_changed = !bdd_lazy(bs)->pg[is_compute];
    if (batch_changed) {
@@ -477,15 +476,7 @@ zink_descriptors_update_lazy(struct zink_context *ctx, bool is_compute)
                     (dd_lazy(ctx)->push_state_changed[is_compute] || batch_changed);
    if (!populate_sets(ctx, pg, &changed_sets, need_push, desc_sets)) {
       debug_printf("ZINK: couldn't get descriptor sets!\n");
-      return false;
-   }
-   if (ctx->batch.state != bs) {
-      /* recheck: populate may have overflowed the pool and triggered a flush */
-      batch_changed = true;
-      ret = true;
-      dd_lazy(ctx)->state_changed[is_compute] = pg->dd->binding_usage;
-      changed_sets = pg->dd->binding_usage & dd_lazy(ctx)->state_changed[is_compute];
-      dd_lazy(ctx)->push_state_changed[is_compute] = !!pg->dd->push_usage;
+      return;
    }
    /* no flushing allowed */
    assert(ctx->batch.state == bs);
@@ -528,7 +519,6 @@ zink_descriptors_update_lazy(struct zink_context *ctx, bool is_compute)
    /* set again in case of flushing */
    bdd_lazy(bs)->pg[is_compute] = pg;
    ctx->dd->pg[is_compute] = pg;
-   return ret;
 }
 
 void
