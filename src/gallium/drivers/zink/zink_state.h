@@ -52,6 +52,8 @@ struct zink_rasterizer_hw_state {
    VkPolygonMode polygon_mode;
    VkCullModeFlags cull_mode;
    VkProvokingVertexModeEXT pv_mode;
+   VkLineRasterizationModeEXT line_mode;
+   bool line_stipple_enable;
    bool force_persample_interp;
    bool conservative;
 };

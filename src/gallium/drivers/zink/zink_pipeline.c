@@ -201,6 +201,19 @@ zink_create_gfx_pipeline(struct zink_screen *screen,
       dynamicStateEnables[state_count++] = VK_DYNAMIC_STATE_SCISSOR;
    }
 
+   VkPipelineRasterizationLineStateCreateInfoEXT line_state;
+   if (screen->info.have_EXT_line_rasterization) {
+      memset(&line_state, 0, sizeof(line_state));
+      line_state.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_LINE_STATE_CREATE_INFO_EXT;
+      if (state->rast_state->line_stipple_enable) {
+         dynamicStateEnables[state_count++] = VK_DYNAMIC_STATE_LINE_STIPPLE_EXT;
+         line_state.stippledLineEnable = VK_TRUE;
+      }
+      line_state.lineRasterizationMode = state->rast_state->line_mode;
+      line_state.pNext = rast_state.pNext;
+      rast_state.pNext = &line_state;
+   }
+
    VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo = {};
    pipelineDynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
    pipelineDynamicStateCreateInfo.pDynamicStates = dynamicStateEnables;

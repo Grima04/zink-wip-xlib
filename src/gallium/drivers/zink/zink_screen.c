@@ -1412,6 +1412,10 @@ load_device_extensions(struct zink_screen *screen)
       GET_PROC_ADDR(CmdEndConditionalRenderingEXT);
    }
 
+   if (screen->info.have_EXT_line_rasterization) {
+      GET_PROC_ADDR(CmdSetLineStippleEXT);
+   }
+
    if (screen->info.have_KHR_draw_indirect_count) {
       GET_PROC_ADDR_KHR(CmdDrawIndexedIndirectCount);
       GET_PROC_ADDR_KHR(CmdDrawIndirectCount);

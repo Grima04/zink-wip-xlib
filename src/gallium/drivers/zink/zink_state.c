@@ -526,6 +526,9 @@ zink_create_rasterizer_state(struct pipe_context *pctx,
       return NULL;
 
    state->base = *rs_state;
+   state->base.line_stipple_factor++;
+   state->hw_state.line_stipple_enable = rs_state->line_stipple_enable;
+   state->hw_state.line_mode = rs_state->line_smooth ? VK_LINE_RASTERIZATION_MODE_RECTANGULAR_SMOOTH_EXT : VK_LINE_RASTERIZATION_MODE_BRESENHAM_EXT;
 
    assert(rs_state->depth_clip_far == rs_state->depth_clip_near);
    state->hw_state.depth_clamp = rs_state->depth_clip_near == 0;

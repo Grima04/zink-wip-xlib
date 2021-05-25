@@ -629,8 +629,11 @@ zink_draw_vbo(struct pipe_context *pctx,
    ctx->dsa_state_changed = false;
 
    bool rast_state_changed = ctx->rast_state_changed;
-   if (HAS_DYNAMIC_STATE && (BATCH_CHANGED || rast_state_changed))
+   if (HAS_DYNAMIC_STATE && (BATCH_CHANGED || rast_state_changed)) {
       ctx->screen->vk_CmdSetFrontFaceEXT(batch->state->cmdbuf, ctx->gfx_pipeline_state.front_face);
+      if (ctx->screen->info.have_EXT_line_rasterization && rast_state->base.line_stipple_enable)
+         ctx->screen->vk_CmdSetLineStippleEXT(batch->state->cmdbuf, rast_state->base.line_stipple_factor, rast_state->base.line_stipple_pattern);
+   }
 
    if (BATCH_CHANGED || ctx->rast_state_changed || mode_changed) {
       enum pipe_prim_type reduced_prim = u_reduced_prim(mode);
