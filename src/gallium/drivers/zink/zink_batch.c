@@ -87,7 +87,7 @@ zink_reset_batch_state(struct zink_context *ctx, struct zink_batch_state *bs)
       _mesa_set_remove(bs->fbs, entry);
    }
 
-   bs->flush_res = NULL;
+   pipe_resource_reference(&bs->flush_res, NULL);
 
    ctx->resource_size -= bs->resource_size;
    bs->resource_size = 0;
@@ -375,7 +375,8 @@ submit_queue(void *data, int thread_index)
    };
 
    if (bs->flush_res && screen->needs_mesa_flush_wsi) {
-      mem_signal.memory = bs->flush_res->scanout_obj ? bs->flush_res->scanout_obj->mem : bs->flush_res->obj->mem;
+      struct zink_resource *flush_res = zink_resource(bs->flush_res);
+      mem_signal.memory = flush_res->scanout_obj ? flush_res->scanout_obj->mem : flush_res->obj->mem;
       si.pNext = &mem_signal;
    }
 
@@ -517,7 +518,7 @@ void
 zink_end_batch(struct zink_context *ctx, struct zink_batch *batch)
 {
    if (batch->state->flush_res)
-      copy_scanout(ctx, batch->state->flush_res);
+      copy_scanout(ctx, zink_resource(batch->state->flush_res));
 
    if (!ctx->queries_disabled)
       zink_suspend_queries(ctx, batch);
