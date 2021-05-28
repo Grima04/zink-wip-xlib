@@ -37,6 +37,7 @@
 #include "util/u_surface.h"
 #include "util/u_sampler.h"
 #include "util/u_box.h"
+#include "util/u_prim.h"
 #include "util/u_inlines.h"
 #include "util/u_prim_restart.h"
 #include "util/format/u_format_zs.h"
@@ -208,11 +209,18 @@ static void emit_state(struct rendering_state *state)
 
    if (state->rs_dirty) {
       bool ms = state->rs_state.multisample;
+      unsigned sample_mask = state->sample_mask;
       if (state->rs_state.line_smooth)
          state->rs_state.multisample = false;
+      else if (state->rs_state.multisample) {
+         if (u_reduced_prim(state->info.mode) == PIPE_PRIM_LINES)
+            state->sample_mask = 0xffffffff;
+         state->sample_mask_dirty = true;
+      }
       cso_set_rasterizer(state->cso, &state->rs_state);
       state->rs_dirty = false;
       state->rs_state.multisample = ms;
+      state->sample_mask = sample_mask;
    }
 
    if (state->dsa_dirty) {
