@@ -796,8 +796,8 @@ zink_draw_vbo(struct pipe_context *pctx,
    batch->has_work = true;
    ctx->batch.work_count = work_count;
    /* flush if there's >100k draws */
-   if (unlikely(FORCE_FLUSH || work_count >= 100000))
-      pctx->flush(pctx, NULL, PIPE_FLUSH_ASYNC);
+   if (unlikely(FORCE_FLUSH || work_count >= 30000) || ctx->oom_flush)
+      pctx->flush(pctx, NULL, 0);
 }
 
 template <zink_work_dim NEEDS_WORK_DIM, bool BATCH_CHANGED, zink_force_flush FORCE_FLUSH>
@@ -849,8 +849,8 @@ zink_launch_grid(struct pipe_context *pctx, const struct pipe_grid_info *info)
    batch->has_work = true;
    /* flush if there's >100k computes */
    if (unlikely(FORCE_FLUSH ||
-                ctx->batch.work_count >= 100000))
-      pctx->flush(pctx, NULL, PIPE_FLUSH_ASYNC);
+                ctx->batch.work_count >= 30000) || ctx->oom_flush)
+      pctx->flush(pctx, NULL, 0);
 }
 
 template <zink_multidraw HAS_MULTIDRAW, zink_dynamic_state HAS_DYNAMIC_STATE, bool BATCH_CHANGED, zink_trifan HAS_TRIFANS,
