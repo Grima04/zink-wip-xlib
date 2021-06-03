@@ -444,7 +444,7 @@ zink_clamp_void_swizzle(const struct util_format_description *desc, enum pipe_sw
 void
 zink_rebind_all_buffers(struct zink_context *ctx);
 
-void
+bool
 zink_resource_rebind(struct zink_context *ctx, struct zink_resource *res);
 
 void
