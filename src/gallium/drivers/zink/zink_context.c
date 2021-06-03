@@ -3459,6 +3459,92 @@ zink_rebind_all_buffers(struct zink_context *ctx)
 }
 
 static void
+rebind_replaced_buffer(struct zink_context *ctx, struct zink_resource *res, unsigned num_rebinds, uint32_t bindings)
+{
+   bool has_write = false;
+   unsigned count = 0;
+
+   if (bindings & BITFIELD_BIT(TC_BINDING_VERTEX_BUFFER)) {
+      ctx->vertex_buffers_dirty = true;
+      u_foreach_bit(slot, ctx->gfx_pipeline_state.vertex_buffers_enabled_mask) {
+         if (ctx->vertex_buffers[slot].buffer.resource == &res->base.b) {
+            set_vertex_buffer_clamped(ctx, slot);
+            if (++count == num_rebinds)
+               goto out;
+         }
+      }
+   }
+
+   if (bindings & BITFIELD_BIT(TC_BINDING_STREAMOUT_BUFFER)) {
+      for (unsigned i = 0; i < ctx->num_so_targets; i++) {
+         struct zink_resource *so = zink_resource(ctx->so_targets[i]->buffer);
+         if (so == res) {
+            if (res->bind_history & ZINK_RESOURCE_USAGE_STREAMOUT)
+               ctx->dirty_so_targets = true;
+            /* force counter buffer reset */
+            res->bind_history &= ~ZINK_RESOURCE_USAGE_STREAMOUT;
+            if (++count == num_rebinds)
+               goto out;
+         }
+      }
+   }
+
+   uint32_t ubo_mask = bindings & u_bit_consecutive(TC_BINDING_UBO_VS, PIPE_SHADER_TYPES);
+   u_foreach_bit(shader, ubo_mask >> TC_BINDING_UBO_VS) {
+      for (unsigned slot = 0; slot < ctx->di.num_ubos[shader]; slot++) {
+         struct zink_resource *b = zink_get_resource_for_descriptor(ctx, ZINK_DESCRIPTOR_TYPE_UBO, shader, slot);
+         if (b == res) {
+            rebind_ubo(ctx, shader, slot);
+            if (++count == num_rebinds)
+               goto out;
+         }
+      }
+   }
+
+   uint32_t sv_mask = bindings & u_bit_consecutive(TC_BINDING_SAMPLERVIEW_VS, PIPE_SHADER_TYPES);
+   u_foreach_bit(shader, sv_mask >> TC_BINDING_SAMPLERVIEW_VS) {
+      for (unsigned slot = 0; slot < ctx->di.num_sampler_views[shader]; slot++) {
+         struct zink_resource *b = zink_get_resource_for_descriptor(ctx, ZINK_DESCRIPTOR_TYPE_SAMPLER_VIEW, shader, slot);
+         if (b == res) {
+            rebind_tbo(ctx, shader, slot);
+            if (++count == num_rebinds)
+               goto out;
+         }
+      }
+   }
+
+   uint32_t ssbo_mask = bindings & u_bit_consecutive(TC_BINDING_SSBO_VS, PIPE_SHADER_TYPES);
+   u_foreach_bit(shader, ssbo_mask >> TC_BINDING_SSBO_VS) {
+      for (unsigned slot = 0; slot < ctx->di.num_ssbos[shader]; slot++) {
+         struct zink_resource *b = zink_get_resource_for_descriptor(ctx, ZINK_DESCRIPTOR_TYPE_SSBO, shader, slot);
+         if (b == res) {
+            rebind_ssbo(ctx, shader, slot);
+            has_write |= (ctx->writable_ssbos[shader] & BITFIELD64_BIT(slot)) != 0;
+            if (++count == num_rebinds)
+               goto out;
+         }
+      }
+   }
+
+   uint32_t img_mask = bindings & u_bit_consecutive(TC_BINDING_IMAGE_VS, PIPE_SHADER_TYPES);
+   u_foreach_bit(shader, img_mask >> TC_BINDING_IMAGE_VS) {
+      for (unsigned slot = 0; slot < ctx->di.num_images[shader]; slot++) {
+         struct zink_resource *b = zink_get_resource_for_descriptor(ctx, ZINK_DESCRIPTOR_TYPE_IMAGE, shader, slot);
+         if (b == res) {
+            rebind_ibo(ctx, shader, slot);
+            const struct zink_image_view *image_view = &ctx->image_views[shader][slot];
+            has_write |= (image_view->base.access & PIPE_IMAGE_ACCESS_WRITE) != 0;
+            if (++count == num_rebinds)
+               goto out;
+         }
+      }
+   }
+out:
+   assert(count == num_rebinds);
+   zink_batch_resource_usage_set(&ctx->batch, res, has_write);
+}
+
+static void
 zink_context_replace_buffer_storage(struct pipe_context *pctx, struct pipe_resource *dst,
                                     struct pipe_resource *src, unsigned num_rebinds,
                                     uint32_t bindings, uint32_t delete_buffer_id)
@@ -3475,7 +3561,9 @@ zink_context_replace_buffer_storage(struct pipe_context *pctx, struct pipe_resou
    d->access = s->access;
    d->access_stage = s->access_stage;
    d->unordered_barrier = s->unordered_barrier;
-   if (!zink_resource_rebind(ctx, d))
+   if (num_rebinds)
+      rebind_replaced_buffer(ctx, d, num_rebinds, bindings);
+   if (num_rebinds < d->bind_count[0] + d->bind_count[1])
       ctx->buffer_rebind_counter = p_atomic_inc_return(&ctx->screen->buffer_rebind_counter);
 }
 
