@@ -296,6 +296,8 @@ struct zink_context {
    struct pipe_surface *dummy_surface;
    struct zink_buffer_view *dummy_bufferview;
 
+   unsigned buffer_rebind_counter;
+
    struct {
       /* descriptor info */
       VkDescriptorBufferInfo ubos[PIPE_SHADER_TYPES][PIPE_MAX_CONSTANT_BUFFERS];
@@ -438,6 +440,9 @@ zink_component_mapping(enum pipe_swizzle swizzle)
 
 enum pipe_swizzle
 zink_clamp_void_swizzle(const struct util_format_description *desc, enum pipe_swizzle swizzle);
+
+void
+zink_rebind_all_buffers(struct zink_context *ctx);
 
 void
 zink_resource_rebind(struct zink_context *ctx, struct zink_resource *res);

@@ -447,6 +447,10 @@ zink_draw_vbo(struct pipe_context *pctx,
       util_primconvert_draw_vbo(ctx->primconvert, dinfo, drawid_offset, dindirect, draws, num_draws);
       return;
    }
+   if (unlikely(ctx->buffer_rebind_counter < ctx->screen->buffer_rebind_counter)) {
+      ctx->buffer_rebind_counter = ctx->screen->buffer_rebind_counter;
+      zink_rebind_all_buffers(ctx);
+   }
    if (ctx->gfx_pipeline_state.vertices_per_patch != dinfo->vertices_per_patch)
       ctx->gfx_pipeline_state.dirty = true;
    bool drawid_broken = ctx->drawid_broken;
